@@ -34,13 +34,49 @@ st.markdown("""
 def load_data(season_filter="All Years"):
     if season_filter == "All Years":
         # Load aggregate rankings (original format - one row per QB)
-        df = pd.read_csv('qb_rankings_2021_2025.csv')
+        df = pd.read_csv('qb_rankings_2010_2025.csv')
     else:
         # Load per-season data and filter
         df = pd.read_csv('qb_rankings_by_season.csv')
-        df = df[df['season'] == int(season_filter)]
         
-        # Calculate composite score for this season using same weights as notebook
+        # Handle multiple years (list) or single year (string)
+        if isinstance(season_filter, list):
+            # Handle empty list
+            if not season_filter:
+                # Fall back to all years
+                df = pd.read_csv('qb_rankings_2010_2025.csv')
+                return load_data("All Years")
+            
+            # Convert list elements to int if they're strings
+            years = [int(y) if isinstance(y, str) else y for y in season_filter]
+            df = df[df['season'].isin(years)]
+            
+            # Check if we have data after filtering
+            if len(df) == 0:
+                st.error(f"No data found for selected years: {season_filter}")
+                return load_data("All Years")
+            
+            # Aggregate across selected years
+            agg_funcs = {
+                'pass_attempts': 'sum',
+                'total_epa_per_play': 'mean',
+                'cpoe_mean': 'mean',
+                'sack_rate': 'mean',
+                'yards_per_attempt': 'mean',
+                'td_turnover_ratio': 'mean',
+                'success_rate': 'mean',
+                'completion_pct': 'mean',
+                'rushing_yards': 'sum',
+                'interceptions': 'sum',
+                'fumbles_lost': 'sum',
+                'total_plays': 'sum',
+                'total_games': 'sum'
+            }
+            df = df.groupby('passer_player_name').agg(agg_funcs).reset_index()
+        else:
+            df = df[df['season'] == int(season_filter)]
+        
+        # Calculate composite score for filtered data using same weights as notebook
         feature_columns = ['total_epa_per_play', 'cpoe_mean', 'yards_per_attempt', 
                           'td_turnover_ratio', 'completion_pct']
         
@@ -62,14 +98,14 @@ def load_data(season_filter="All Years"):
         else:
             X_normalized['sack_rate_inv'] = 50
         
-        # Calculate composite score with notebook weights
+        # Calculate composite score with updated notebook weights
         feature_weights = {
-            'total_epa_per_play': 0.26,
+            'total_epa_per_play': 0.25,
             'cpoe_mean': 0.15,
-            'yards_per_attempt': 0.13,
+            'yards_per_attempt': 0.12,
             'td_turnover_ratio': 0.11,
             'completion_pct': 0.09,
-            'sack_rate_inv': 0.03
+            'sack_rate_inv': 0.05
         }
         
         df['composite_score'] = sum(
@@ -223,15 +259,73 @@ def load_data(season_filter="All Years"):
     return df, top_30, qb_teams
 # Sidebar for year selection
 st.sidebar.header("Filter Options")
-selected_year = st.sidebar.selectbox(
-    "Select Season",
-    options=["All Years", "2021", "2022", "2023", "2024", "2025"],
+
+# Option to select single year or multiple years
+filter_mode = st.sidebar.radio(
+    "Filter Mode",
+    options=["All Years", "Single Year", "Multiple Years", "Year Range"],
     index=0,
-    help="Filter all visualizations by season"
+    help="Choose how to filter seasons"
 )
 
-# Title
-title_text = f"🏈 Top 30 NFL Quarterbacks ({selected_year if selected_year != 'All Years' else '2021-2025'})"
+if filter_mode == "Single Year":
+    selected_year = st.sidebar.selectbox(
+        "Select Season",
+        options=["2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025"],
+        index=15,  # Default to 2025
+        help="Select a single season"
+    )
+elif filter_mode == "Multiple Years":
+    selected_years = st.sidebar.multiselect(
+        "Select Seasons",
+        options=["2010", "2011", "2012", "2013", "2014", "2015", "2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024", "2025"],
+        default=["2023", "2024", "2025"],
+        help="Select one or more seasons"
+    )
+    # If no years selected, default to All Years
+    if not selected_years:
+        selected_year = "All Years"
+    else:
+        selected_year = selected_years
+elif filter_mode == "Year Range":
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        start_year = st.selectbox("From", options=list(range(2010, 2026)), index=0)
+    with col2:
+        end_year = st.selectbox("To", options=list(range(2010, 2026)), index=15)
+    
+    if start_year > end_year:
+        st.sidebar.error("Start year must be <= end year")
+        selected_year = "All Years"
+    else:
+        selected_year = list(range(start_year, end_year + 1))
+else:
+    selected_year = "All Years"
+
+# Title - format the year display nicely
+if selected_year == "All Years":
+    year_display = "2010-2025"
+elif isinstance(selected_year, list):
+    if len(selected_year) == 0:
+        year_display = "2010-2025"
+    elif len(selected_year) == 1:
+        year_display = str(selected_year[0])
+    else:
+        # Convert to integers for comparison
+        years_int = [int(y) if isinstance(y, str) else y for y in selected_year]
+        years_sorted = sorted(years_int)
+        
+        # Check if consecutive
+        if len(years_sorted) == len(range(min(years_sorted), max(years_sorted) + 1)):
+            # Consecutive years
+            year_display = f"{min(years_sorted)}-{max(years_sorted)}"
+        else:
+            # Non-consecutive years
+            year_display = ", ".join(map(str, years_sorted))
+else:
+    year_display = str(selected_year)
+
+title_text = f"🏈 Top 30 NFL Quarterbacks ({year_display})"
 st.title(title_text)
 st.markdown("Comprehensive playstyle analysis and rankings")
 
@@ -436,7 +530,7 @@ try:
         st.header("🔍 Advanced QB Performance Analysis")
         st.markdown("""
         These visualizations provide deeper insights into quarterback performance using advanced metrics 
-        from play-by-play data across the 2021-2025 seasons. Each chart reveals different dimensions of QB effectiveness.
+        from play-by-play data across the 2010-2025 seasons. Each chart reveals different dimensions of QB effectiveness.
         """)
         
         # Add team colors to full dataframe for scatter plots
@@ -727,10 +821,24 @@ try:
             
             # Apply season filter if not "All Years"
             if selected_year != "All Years":
-                situational_df = situational_df[situational_df['season'] == int(selected_year)]
+                if isinstance(selected_year, list):
+                    # Filter for multiple years
+                    years = [int(y) if isinstance(y, str) else y for y in selected_year]
+                    situational_df = situational_df[situational_df['season'].isin(years)]
+                else:
+                    # Single year
+                    situational_df = situational_df[situational_df['season'] == int(selected_year)]
             
-            # Get top 20 QBs in order
+            # Get top 20 QBs based on CURRENT filtered rankings (matches year filter)
+            # This ensures we show top 20 QBs for the selected year, not overall
             top_20_names = df.head(20)['passer_player_name'].tolist()
+            
+            # Filter situational data to only include top 20 QBs
+            # Only keep QBs that actually appear in the filtered situational data
+            available_qbs = situational_df['qb_name'].unique()
+            top_20_in_data = [qb for qb in top_20_names if qb in available_qbs]
+            
+            situational_df = situational_df[situational_df['qb_name'].isin(top_20_in_data)]
             
             # Define column orders for proper left-to-right display
             field_zone_order = ['Red Zone', 'Scoring Range', 'Midfield', 'Own Territory']
@@ -762,9 +870,11 @@ try:
                 elif situation == 'score_situation':
                     heatmap_data = heatmap_data.reindex(columns=score_situation_order, fill_value=0)
                 
-                # Reorder rows by top 20 ranking (inverted so best QBs at top)
-                qb_order = [qb for qb in top_20_names if qb in heatmap_data.index]
-                heatmap_data = heatmap_data.loc[qb_order[::-1]]  # Reverse order
+                # Ensure all available top 20 QBs are in the heatmap (add missing ones with zeros)
+                heatmap_data = heatmap_data.reindex(index=top_20_in_data, fill_value=0)
+                
+                # Reverse order so best QBs at top
+                heatmap_data = heatmap_data.iloc[::-1]
                 
                 # Create heatmap
                 heatmap = go.Heatmap(
@@ -785,7 +895,7 @@ try:
                 fig3.add_trace(heatmap, row=1, col=idx+1)
             
             fig3.update_layout(
-                title_text="Situational QB Performance: Total EPA Across Game Contexts<br>(Top 20 QBs by Overall EPA/play)",
+                title_text=f"Situational QB Performance: Total EPA Across Game Contexts<br>(Top 20 QBs by Overall Rating)",
                 height=600,
                 showlegend=False
             )
@@ -824,7 +934,7 @@ try:
     # Footer
     st.markdown("---")
     st.markdown("""
-    **Data Source:** nflfastR play-by-play data (2021-2025 seasons)
+    **Data Source:** nflfastR play-by-play data (2010-2025 seasons)
     
     **Playstyle Dimensions (0-100 scale):**
     - **Mobility**: Rushing yards per game
@@ -835,7 +945,7 @@ try:
     """)
 
 except FileNotFoundError:
-    st.error("⚠️ Data file 'qb_rankings_2021_2025.csv' not found. Please ensure the file is in the same directory as this app.")
+    st.error("⚠️ Data file 'qb_rankings_2010_2025.csv' not found. Please ensure the file is in the same directory as this app.")
 except Exception as e:
     st.error(f"An error occurred: {str(e)}")
     import traceback
