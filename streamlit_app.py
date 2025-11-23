@@ -31,8 +31,61 @@ st.markdown("""
 
 # Load data
 @st.cache_data
-def load_data():
-    df = pd.read_csv('qb_rankings_2021_2025.csv')
+def load_data(season_filter="All Years"):
+    if season_filter == "All Years":
+        # Load aggregate rankings (original format - one row per QB)
+        df = pd.read_csv('qb_rankings_2021_2025.csv')
+    else:
+        # Load per-season data and filter
+        df = pd.read_csv('qb_rankings_by_season.csv')
+        df = df[df['season'] == int(season_filter)]
+        
+        # Calculate composite score for this season using same weights as notebook
+        feature_columns = ['total_epa_per_play', 'cpoe_mean', 'yards_per_attempt', 
+                          'td_turnover_ratio', 'completion_pct']
+        
+        # Normalize features to 0-100
+        X_normalized = df[feature_columns].copy()
+        for col in feature_columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                X_normalized[col] = 100 * (df[col] - min_val) / (max_val - min_val)
+            else:
+                X_normalized[col] = 50
+        
+        # Invert sack_rate (lower is better)
+        min_val = df['sack_rate'].min()
+        max_val = df['sack_rate'].max()
+        if max_val > min_val:
+            X_normalized['sack_rate_inv'] = 100 - (100 * (df['sack_rate'] - min_val) / (max_val - min_val))
+        else:
+            X_normalized['sack_rate_inv'] = 50
+        
+        # Calculate composite score with notebook weights
+        feature_weights = {
+            'total_epa_per_play': 0.26,
+            'cpoe_mean': 0.15,
+            'yards_per_attempt': 0.13,
+            'td_turnover_ratio': 0.11,
+            'completion_pct': 0.09,
+            'sack_rate_inv': 0.03
+        }
+        
+        df['composite_score'] = sum(
+            X_normalized[col] * feature_weights[col] 
+            for col in feature_weights.keys()
+        )
+        
+        # Normalize to 0-100
+        min_score = df['composite_score'].min()
+        max_score = df['composite_score'].max()
+        df['qb_rating'] = 100 * (df['composite_score'] - min_score) / (max_score - min_score)
+        
+        # Sort and rank
+        df = df.sort_values('qb_rating', ascending=False).reset_index(drop=True)
+        df['rank'] = range(1, len(df) + 1)
+        df['percentile'] = 100 * (len(df) - df['rank'] + 1) / len(df)
     # Get top 30 and calculate playstyle dimensions
     top_30 = df.head(30).copy()
     
@@ -168,14 +221,23 @@ def load_data():
     top_30['team'] = top_30['passer_player_name'].map(qb_teams)
     
     return df, top_30, qb_teams
+# Sidebar for year selection
+st.sidebar.header("Filter Options")
+selected_year = st.sidebar.selectbox(
+    "Select Season",
+    options=["All Years", "2021", "2022", "2023", "2024", "2025"],
+    index=0,
+    help="Filter all visualizations by season"
+)
 
 # Title
-st.title("🏈 Top 30 NFL Quarterbacks (2021-2025)")
+title_text = f"🏈 Top 30 NFL Quarterbacks ({selected_year if selected_year != 'All Years' else '2021-2025'})"
+st.title(title_text)
 st.markdown("Comprehensive playstyle analysis and rankings")
 
-# Load the data
+# Load the data with filter
 try:
-    df, top_30, qb_teams = load_data()
+    df, top_30, qb_teams = load_data(season_filter=selected_year)
     
     # Create tabs
     tab1, tab2 = st.tabs(["📊 Top 30 Rankings", "🔍 Advanced Analysis"])
@@ -251,12 +313,12 @@ try:
                             text=f"#{int(qb['rank'])} {qb['passer_player_name']}<br><sub>{qb['custom_archetype']}</sub>",
                             font=dict(size=11)
                         ),
-                        height=250,
-                        margin=dict(l=10, r=10, t=50, b=10)
+                        height=300,
+                        margin=dict(l=60, r=60, t=60, b=60)
                     )
                     
                     with cols[col_idx]:
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
         
         # Section 2: Detailed Table
         st.header("Detailed Statistics - Top 30 QBs")
@@ -306,7 +368,7 @@ try:
         
         st.dataframe(
             styled_df,
-            width='stretch',
+            use_container_width=True,
             height=600
         )
         
@@ -367,7 +429,7 @@ try:
             hovermode='closest'
         )
         
-        st.plotly_chart(fig_lollipop, width='stretch')
+        st.plotly_chart(fig_lollipop, use_container_width=True)
     
     # TAB 2: Advanced Analysis
     with tab2:
@@ -497,7 +559,7 @@ try:
             hovermode='closest'
         )
         
-        st.plotly_chart(fig1, width='stretch')
+        st.plotly_chart(fig1, use_container_width=True)
         
         st.markdown(f"""
         **Key Statistics:**
@@ -624,7 +686,7 @@ try:
             hovermode='closest'
         )
         
-        st.plotly_chart(fig2, width='stretch')
+        st.plotly_chart(fig2, use_container_width=True)
         
         st.markdown(f"""
         **Key Statistics:**
@@ -662,6 +724,10 @@ try:
         # Load situational data
         try:
             situational_df = pd.read_csv('situational_epa_top20.csv')
+            
+            # Apply season filter if not "All Years"
+            if selected_year != "All Years":
+                situational_df = situational_df[situational_df['season'] == int(selected_year)]
             
             # Get top 20 QBs in order
             top_20_names = df.head(20)['passer_player_name'].tolist()
@@ -730,7 +796,7 @@ try:
                 if i == 1:
                     fig3.update_yaxes(title_text="Quarterback", row=1, col=i)
             
-            st.plotly_chart(fig3, width='stretch')
+            st.plotly_chart(fig3, use_container_width=True)
             
             st.markdown("""
             **Situational Performance Insights:**
