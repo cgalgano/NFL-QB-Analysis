@@ -552,7 +552,7 @@ try:
         )
         
         fig1.update_layout(
-            title="QB Performance: Total EPA vs CPOE (2021-2025)",
+            title="QB Performance: Total EPA vs CPOE",
             xaxis_title="CPOE (Completion % Over Expected)",
             yaxis_title="Total EPA per Play (Passing + Rushing)",
             height=700,
@@ -678,7 +678,7 @@ try:
         )
         
         fig2.update_layout(
-            title="QB Pocket Management vs Offensive Output (2021-2025)",
+            title="QB Pocket Management vs Offensive Output",
             xaxis_title="Sack Rate (%)",
             yaxis_title="Yards per Attempt",
             xaxis=dict(autorange='reversed'),  # Invert x-axis
@@ -785,7 +785,7 @@ try:
                 fig3.add_trace(heatmap, row=1, col=idx+1)
             
             fig3.update_layout(
-                title_text="Situational QB Performance: Total EPA Across Game Contexts<br>(Top 20 QBs by Overall EPA/play - Passing + Rushing)",
+                title_text="Situational QB Performance: Total EPA Across Game Contexts<br>(Top 20 QBs by Overall EPA/play)",
                 height=600,
                 showlegend=False
             )
