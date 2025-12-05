@@ -50,5 +50,7 @@ Thumbs.db
 # Environment variables
 .env
 
+chromedriver-win64/
+
 # Database
 *.db
