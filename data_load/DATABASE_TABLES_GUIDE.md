@@ -1,0 +1,718 @@
+# NFL QB Database - Complete Tables Reference
+
+## Overview
+Comprehensive field-level documentation for all tables in `nfl_qb_data.db` for NFL quarterback analysis (2010-2025).
+
+**Database Location:** `data_load/nfl_qb_data.db`  
+**Total Tables:** 8 (6 primary analysis tables + 2 system tables)  
+**Total Size:** ~1.4 GB
+
+---
+
+## Table of Contents
+1. [ESPN QBR](#espn-qbr) - Season-level QBR ratings (502 rows)
+2. [Next Gen Stats](#next-gen-stats) - Advanced tracking metrics (5,697 rows)
+3. [NFL ELO QB Rankings](#nfl-elo-qb-rankings) - Comprehensive season stats (687 rows)
+4. [QB Statistics](#qb-statistics) - Weekly game-by-game stats (10,029 rows)
+5. [Player Contracts](#player-contracts) - Contract & salary data (1,939 rows)
+6. [Play-by-Play](#play-by-play) - Every play 2010-2025 (754,858 rows)
+7. [Database Schema & Relationships](#database-schema)
+8. [Quick Start Guide](#quick-start-guide)
+
+---
+
+## ESPN QBR
+
+**Table:** `espn_qbr`  
+**Granularity:** Season-level (one row per QB per season)  
+**Rows:** 502  
+**Time Period:** 2010-2025  
+**Purpose:** ESPN's proprietary Total Quarterback Rating with component breakdowns
+
+### What This Table Tells You
+ESPN QBR is a 0-100 rating that measures QB contribution to winning, accounting for every action on every play. This table provides the overall QBR plus its underlying components (passing, rushing, sacks, penalties) and relates it to EPA and Points Added Above Average.
+
+### Fields (14 columns)
+
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `RK` | INTEGER | Season rank by QBR | `1` |
+| `QBR` | REAL | Total QBR score (0-100, higher is better) | `79.1` |
+| `PAA` | REAL | Points Added Above Average per game | `52.0` |
+| `PLAYS` | INTEGER | Total plays evaluated for QBR | `574` |
+| `EPA` | REAL | Expected Points Added (total contribution) | `79.1` |
+| `PASS` | REAL | QBR points from passing plays | `66.7` |
+| `RUN` | REAL | QBR points from rushing plays | `0.8` |
+| `SACK` | REAL | QBR points lost to sacks (negative) | `-8.9` |
+| `PEN` | REAL | QBR points from penalty plays | `2.8` |
+| `RAW` | REAL | Raw QBR before opponent adjustments | `78.3` |
+| `Season` | INTEGER | NFL season year | `2024` |
+| `NAME` | TEXT | Abbreviated name from ESPN | `"L.Jackson"` |
+| `player_name` | TEXT | Full name (standardized for joins) | `"Lamar Jackson"` |
+| `player_id` | TEXT | GSIS player ID (unique identifier) | `"00-0036389"` |
+
+### Key Insights
+- **QBR vs Passer Rating:** QBR accounts for situations (score, time, field position), passer rating doesn't
+- **Components:** See how much of a QB's value comes from passing vs rushing
+- **PAA:** Measures true impact - how many points above a replacement-level QB
+- **One season = one row:** Patrick Mahomes 2023 is separate from Mahomes 2024
+
+### Use Cases
+- Compare QB seasons across eras (QBR is era-adjusted)
+- Identify dual-threat QBs (high RUN component)
+- Find QBs who protect the ball (low negative SACK component)
+- Track year-over-year QB development
+
+---
+
+## Next Gen Stats
+
+**Table:** `next_gen_stats`  
+**Granularity:** Week-level (separate row for each QB each week, plus season totals)  
+**Rows:** 5,697  
+**Time Period:** 2016-2025 (NGS tracking started in 2016)  
+**Purpose:** Advanced tracking metrics from player tracking technology (time to throw, throw depth, completion probability)
+
+### What This Table Tells You
+Next Gen Stats uses player tracking technology (chips in shoulder pads) to measure throwing mechanics and decision-making that traditional stats miss. This includes how fast a QB releases the ball, how deep they throw, how tight the windows are, and whether they're beating expected completion rates.
+
+### Fields (30 columns)
+
+#### Identifiers
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `season` | INTEGER | NFL season year | `2024` |
+| `season_type` | TEXT | Regular/postseason | `"REG"` |
+| `week` | INTEGER | Week number (0 = season total) | `1` or `0` |
+| `player_id` | TEXT | GSIS unique identifier | `"00-0036389"` |
+| `player_name` | TEXT | Full name for joins | `"Lamar Jackson"` |
+| `player_display_name` | TEXT | Display format | `"Lamar Jackson"` |
+| `player_first_name` | TEXT | First name | `"Lamar"` |
+| `player_last_name` | TEXT | Last name | `"Jackson"` |
+| `player_short_name` | TEXT | Abbreviated | `"L.Jackson"` |
+| `player_jersey_number` | INTEGER | Jersey # | `8` |
+| `player_position` | TEXT | Position | `"QB"` |
+| `team_abbr` | TEXT | Team abbreviation | `"BAL"` |
+
+#### Throwing Mechanics & Decision Making
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `avg_time_to_throw` | REAL | Seconds from snap to release | `2.58` |
+| `avg_completed_air_yards` | REAL | Air distance on completions only | `6.2` |
+| `avg_intended_air_yards` | REAL | Air distance on all throws (inc incomplete) | `7.9` |
+| `avg_air_yards_differential` | REAL | Completed - intended (measures risk) | `-1.7` |
+| `aggressiveness` | REAL | % of passes into tight coverage (≤1 yd separation) | `18.2` |
+| `max_completed_air_distance` | REAL | Longest completed air yards | `58.4` |
+| `avg_air_yards_to_sticks` | REAL | How far past/short of 1st down marker | `-0.8` |
+| `avg_air_distance` | REAL | Average intended depth of target | `8.7` |
+| `max_air_distance` | REAL | Deepest throw attempted | `62.1` |
+
+#### Completion Probability (AI-Powered)
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `expected_completion_percentage` | REAL | AI model prediction based on coverage, distance, etc. | `62.5` |
+| `completion_percentage_above_expectation` | REAL | **CPOE** - actual minus expected (key metric) | `+5.2` |
+
+#### Traditional Stats (for context)
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `attempts` | INTEGER | Pass attempts | `387` |
+| `pass_yards` | INTEGER | Passing yards | `3,678` |
+| `pass_touchdowns` | INTEGER | TD passes | `28` |
+| `interceptions` | INTEGER | INTs thrown | `9` |
+| `passer_rating` | REAL | NFL passer rating | `102.7` |
+| `completions` | INTEGER | Completed passes | `267` |
+| `completion_percentage` | REAL | Completion % | `69.0` |
+
+### Key Insights
+- **Time to Throw:** Fast release (< 2.4s) = quick decisions; Slow (> 2.8s) = holds ball longer
+- **CPOE (Completion % Over Expected):** Best accuracy predictor of future success. Positive = accurate, negative = inaccurate
+- **Aggressiveness:** High % = gunslinger mentality, throws into tight windows
+- **Air Yards Differential:** Negative = lots of incompletions on deep balls
+- **Week 0:** Represents full season totals (use this for season-level analysis)
+
+### Use Cases
+- Identify QBs with quick releases (time to throw)
+- Find accurate deep ball throwers (CPOE + high intended air yards)
+- Detect risk-takers (high aggressiveness %)
+- Compare throwing depth (conservative vs aggressive play calling)
+
+---
+
+## NFL ELO QB Rankings
+
+**Table:** `nflelo_qb_rankings`  
+**Granularity:** Season-level (one row per QB per season)  
+**Rows:** 687  
+**Time Period:** 2010-2025  
+**Purpose:** Most comprehensive season stats table - combines traditional stats, advanced analytics, ELO ratings, and situational metrics
+
+### What This Table Tells You
+This is the Swiss Army knife of QB analysis - it has everything. Traditional box score stats, advanced efficiency metrics (EPA, WPA, CPOE), ELO ratings for era-adjusted comparisons, air yards breakdowns, and clutch performance indicators. If you want a complete season picture without joining tables, start here.
+
+### Fields (47 columns)
+
+#### Identifiers
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `player_name` | TEXT | Full name (standardized) | `"Patrick Mahomes"` |
+| `player_id` | TEXT | GSIS unique identifier | `"00-0033873"` |
+| `Season` | INTEGER | NFL season year | `2024` |
+| `Starts` | INTEGER | Games started | `17` |
+
+#### ELO & Win Probability
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `QB Elo` | REAL | ELO rating (1200-1800 range, higher = better) | `1687.5` |
+| `Change_Week` | REAL | Average weekly ELO change | `+2.3` |
+| `Change_year` | REAL | Total season ELO change | `+45.8` |
+| `Total WPA` | REAL | Total win probability added (season sum) | `3.47` |
+| `WPA / DB` | REAL | Win probability added per dropback | `0.068` |
+| `Points` | REAL | Expected points contribution | `127.8` |
+| `Total` | REAL | Total points above average | `89.2` |
+| `/ DB` | REAL | Points per dropback | `0.18` |
+
+#### Passing Efficiency
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `Comp` | INTEGER | Completions | `401` |
+| `Atts` | INTEGER | Pass attempts | `597` |
+| `Comp_percent` | REAL | Completion % (0-100) | `67.2` |
+| `CPOE` | REAL | Completion % Over Expected (-20 to +20) | `+4.8` |
+| `Yards` | INTEGER | Passing yards | `4,183` |
+| `YPA` | REAL | Yards per attempt | `7.01` |
+| `ANY/A` | REAL | Adjusted Net Yards/Attempt (best efficiency metric) | `6.89` |
+| `Passer Rtg` | REAL | NFL passer rating (0-158.3) | `92.6` |
+
+#### Passing Outcomes
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `TDs` | INTEGER | Passing touchdowns | `29` |
+| `INTs` | INTEGER | Interceptions thrown | `14` |
+| `TD%` | REAL | TD rate (% of attempts) | `4.86` |
+| `INT%` | REAL | INT rate (% of attempts) | `2.35` |
+| `TD%-INT%` | REAL | TD rate minus INT rate (higher = better) | `2.51` |
+| `Inc` | REAL | Incompletion rate | `32.8` |
+
+#### Passing Detail
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `Air Yards` | REAL | Total air yards (before catch) | `2,847` |
+| `YAC` | REAL | Total yards after catch | `1,336` |
+| `aDOT` | REAL | Average depth of target (air yards/attempt) | `8.2` |
+| `vs Sticks` | REAL | Avg throw distance vs 1st down marker | `-0.3` |
+
+#### Rushing
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `Carries` | INTEGER | Rush attempts | `58` |
+| `Yards.1` | INTEGER | Rushing yards | `423` |
+| `YPC` | REAL | Yards per carry | `7.29` |
+| `TDs.1` | INTEGER | Rushing touchdowns | `2` |
+| `Rushing` | REAL | Expected points from rushing | `12.3` |
+
+#### Sacks & Pressure
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `Sacks` | INTEGER | Times sacked | `29` |
+| `Sacks.1` | REAL | Sack rate or EPA impact | `-8.7` |
+
+#### Team Performance & Clutch
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `W` | INTEGER | Wins as starter | `11` |
+| `L` | INTEGER | Losses as starter | `6` |
+| `T` | INTEGER | Ties | `0` |
+| `CB` | INTEGER | 4th quarter comebacks | `3` |
+| `CB Opps` | INTEGER | Comeback opportunities (games trailing in 4Q) | `7` |
+| `CB%` | REAL | Comeback success rate | `42.9` |
+
+#### Other
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `QBR` | REAL | ESPN Total QBR (0-100) | `79.1` |
+| `Success` | REAL | Success rate (% of plays gaining expected value) | `51.2` |
+| `Penalties` | REAL | Penalty rate | `2.1` |
+
+### Key Insights
+- **ELO Rating:** Like chess ELO - adjusts for opponent strength and era. 1600+ = elite, 1500-1600 = very good, 1400-1500 = average
+- **ANY/A:** Best single efficiency metric - accounts for TDs, INTs, and sacks
+- **CPOE:** Measures accuracy independent of receivers - positive = accurate throws
+- **WPA:** Measures clutch performance - who wins games in critical moments
+- **TD%-INT%:** Simple but powerful - elite QBs are 3%+, average is 1.5-2.5%
+
+### Use Cases
+- Historical QB comparisons (ELO adjusts for era)
+- Identify efficient QBs (ANY/A, CPOE)
+- Find clutch performers (WPA, comebacks)
+- Analyze passing attack style (aDOT, air yards vs YAC)
+- Complete season overview without needing joins
+
+---
+
+## QB Statistics
+
+**Table:** `qb_statistics`  
+**Granularity:** Weekly game-level (one row per QB per game)  
+**Rows:** 10,029  
+**Time Period:** 2010-2025  
+**Purpose:** Detailed week-by-week game logs from nflreadpy with EPA, CPOE, and advanced metrics
+
+### What This Table Tells You
+This is your most granular traditional stats view - every QB appearance in every game is a separate row. Unlike season aggregations, you can see game-to-game variance, matchup effects, and performance trends. Includes EPA and CPOE at the game level, making it perfect for analyzing consistency and situational performance.
+
+### Fields (41 columns)
+
+#### Identifiers & Context
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `player_id` | TEXT | GSIS unique identifier | `"00-0034857"` |
+| `player_name` | TEXT | Full name (standardized) | `"Josh Allen"` |
+| `position` | TEXT | Position | `"QB"` |
+| `position_group` | TEXT | Position group | `"QB"` |
+| `headshot_url` | TEXT | URL to player photo | `"https://..."` |
+| `season` | INTEGER | NFL season year | `2024` |
+| `week` | INTEGER | Week number (1-18) | `12` |
+| `season_type` | TEXT | Regular/postseason | `"REG"` (or `"POST"`, `"PRE"`) |
+| `team` | TEXT | QB's team abbreviation | `"BUF"` |
+| `opponent_team` | TEXT | Opposing team | `"KC"` |
+
+#### Passing Statistics
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `completions` | INTEGER | Passes completed | `23` |
+| `attempts` | INTEGER | Pass attempts | `34` |
+| `completion_pct` | REAL | Completion % (0-100) | `67.6` |
+| `passing_yards` | INTEGER | Passing yards | `237` |
+| `yards_per_attempt` | REAL | Yards per attempt | `6.97` |
+| `passing_tds` | INTEGER | Passing touchdowns | `2` |
+| `passing_interceptions` | INTEGER | Interceptions thrown | `0` |
+| `td_int_ratio` | REAL | TD/INT ratio (null if 0 INTs) | `null` |
+
+#### Passing Detail
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `passing_air_yards` | INTEGER | Total air yards (before catch) | `312` |
+| `passing_yards_after_catch` | INTEGER | Total yards after catch | `-75` (negative if sacks) |
+| `pacr` | REAL | Pass Air Conversion Ratio (completions/air yards) | `0.76` |
+| `passing_first_downs` | INTEGER | First downs via pass | `14` |
+| `passing_2pt_conversions` | INTEGER | 2-point conversion passes | `0` |
+
+#### Advanced Passing Metrics
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `passing_epa` | REAL | Expected Points Added from passing | `8.3` |
+| `passing_cpoe` | REAL | Completion % Over Expected | `+2.1` |
+
+#### Sacks
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `sacks_suffered` | INTEGER | Times sacked | `2` |
+| `sack_yards_lost` | INTEGER | Yards lost to sacks | `12` |
+| `sack_fumbles` | INTEGER | Fumbles on sacks | `0` |
+| `sack_fumbles_lost` | INTEGER | Lost fumbles on sacks | `0` |
+
+#### Rushing Statistics
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `carries` | INTEGER | Rush attempts | `8` |
+| `rushing_yards` | INTEGER | Rushing yards | `48` |
+| `rushing_tds` | INTEGER | Rushing touchdowns | `1` |
+| `rushing_fumbles` | INTEGER | Rush fumbles (includes lost + recovered) | `1` |
+| `rushing_fumbles_lost` | INTEGER | Lost rush fumbles | `0` |
+| `rushing_first_downs` | INTEGER | First downs via rush | `3` |
+| `rushing_2pt_conversions` | INTEGER | 2-point rush conversions | `0` |
+
+#### Advanced Rushing Metrics
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `rushing_epa` | REAL | Expected Points Added from rushing | `4.2` |
+
+#### Aggregate Metrics
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `total_epa` | REAL | Combined passing + rushing EPA | `12.5` |
+| `dropbacks` | INTEGER | Total dropbacks (attempts + sacks) | `36` |
+| `turnover_pct` | REAL | Turnover rate (turnovers/touches %) | `0.0` |
+| `negative_play_pct` | REAL | % of plays losing yards | `16.7` |
+
+### Key Insights
+- **EPA per game:** Measures actual value created - positive = above average, negative = below
+- **CPOE:** Accuracy metric independent of receivers - consistent positive CPOE = elite accuracy
+- **Air yards vs YAC:** Shows passing style - high air yards = deep thrower, high YAC = dink & dunk
+- **Total EPA:** Passing + rushing combined - captures dual-threat QB value
+- **Dropbacks:** More accurate than attempts alone (includes sacks)
+
+### Use Cases
+- Analyze game-to-game consistency (variance in EPA, passer rating)
+- Build rolling averages (last 4 weeks, last 8 weeks)
+- Find best/worst single-game performances
+- Compare performance vs specific opponents
+- Track development over time (rookie year week-by-week)
+- Aggregate to season totals with SUM/AVG functions
+
+---
+
+## Player Contracts
+
+**Table:** `player_contracts`  
+**Granularity:** Contract-level (one row per QB contract)  
+**Rows:** 1,939  
+**Time Period:** 2006-present (only QBs signed after 2005)  
+**Purpose:** Contract details including salary, guarantees, inflation adjustments, and draft information
+
+### What This Table Tells You
+Every QB contract signed since 2006 with financial details and player biographical info. Use this to analyze QB market value, correlate performance with salary, identify value contracts, and understand draft pedigree. Inflation-adjusted fields allow fair comparisons across eras.
+
+### Fields (26 columns)
+
+#### Contract Financial Overview
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `contract_id` | INTEGER | Unique contract identifier | `12345` |
+| `player_name` | TEXT | Full name (standardized) | `"Patrick Mahomes"` |
+| `player_id` | TEXT | GSIS unique identifier | `"00-0033873"` |
+| `position` | TEXT | Position (always QB in this table) | `"QB"` |
+| `team` | TEXT | Team abbreviation | `"KC"` |
+| `is_active` | INTEGER | 1 if contract still active, 0 if expired | `1` |
+| `year_signed` | INTEGER | Year contract was signed | `2020` |
+| `years` | INTEGER | Contract length in years | `10` |
+| `value` | REAL | Total contract value in millions | `450.0` |
+| `apy` | REAL | Average per year in millions | `45.0` |
+| `guaranteed` | REAL | Guaranteed money in millions | `141.4` |
+| `apy_cap_pct` | REAL | APY as % of salary cap (0-1 scale) | `0.208` |
+
+#### Inflation-Adjusted (2025 dollars)
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `inflated_value` | REAL | Contract value adjusted to 2025 dollars | `487.2` |
+| `inflated_apy` | REAL | APY adjusted to 2025 dollars | `48.7` |
+| `inflated_guaranteed` | REAL | Guaranteed $ adjusted to 2025 dollars | `153.1` |
+
+#### Player Biographical Info
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `player_page` | TEXT | URL to Over The Cap player page | `"https://overthecap.com/player/..."` |
+| `otc_id` | INTEGER | Over The Cap database ID | `5678` |
+| `date_of_birth` | TEXT | Date of birth | `"1995-09-17"` |
+| `height` | REAL | Height in inches | `74.0` (6'2") |
+| `weight` | REAL | Weight in pounds | `230.0` |
+| `college` | TEXT | College attended | `"Texas Tech"` |
+
+#### Draft Information
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `draft_year` | INTEGER | Year drafted | `2017` |
+| `draft_round` | INTEGER | Draft round | `1` |
+| `draft_overall` | INTEGER | Overall pick number | `10` |
+| `draft_team` | TEXT | Team that drafted player | `"KC"` |
+
+#### Detailed Breakdown
+| Field | Type | Description | Example Value |
+|-------|------|-------------|---------------|
+| `cols` | TEXT | JSON array with year-by-year cap hits, bonuses, guarantees | `"[{\"year\": 2020, \"cap_hit\": 5.3M...}]"` |
+
+### Key Insights
+- **APY Cap %:** QB market rate - elite QBs are 15-22% of cap, good starters 8-15%, backups < 5%
+- **Guaranteed Money:** Security for player - higher % = more secure (elite QBs get 60-80% guaranteed)
+- **Inflation Adjustment:** Use `inflated_` fields to compare Tom Brady's 2010 deal with Josh Allen's 2021 deal fairly
+- **is_active:** Filter `is_active = 1` for current contracts, `= 0` for historical
+- **Draft Pedigree:** `draft_round = 1` QBs typically get bigger 2nd contracts than later-round picks
+
+### Use Cases
+- Value analysis: Join with EPA/performance metrics to find over/underpaid QBs
+- Market trends: Track APY cap % over time
+- Draft ROI: Compare draft position to eventual contract value
+- Team cap management: Sum `apy` for all active QBs on a team
+- Historical comparisons: Use inflation-adjusted fields
+
+---
+
+## Play-by-Play
+
+**Table:** `play_by_play`  
+**Granularity:** Play-level (one row per play)  
+**Rows:** 754,858  
+**Time Period:** 2010-2025  
+**Purpose:** Every single play from 2010-2025 with QB-relevant analytics
+
+### What This Table Tells You
+This is the most granular data in the database - every play is a row. Contains 131 QB-relevant fields including EPA, WPA, CPOE, air yards, pressure metrics, and situational context. Use this for play-level analysis, building custom aggregations, or studying specific game situations.
+
+### Quick Reference
+
+**Total Fields:** 132 (131 original + `player_name` added for joins)
+
+#### Key Field Categories:
+- **Identifiers:** `play_id`, `game_id`, `passer_player_id`, `passer_player_name`, `player_name`
+- **Context:** `season`, `week`, `down`, `ydstogo`, `yardline_100`, `score_differential`, `half_seconds_remaining`
+- **Core Metrics:** `epa`, `cpoe`, `wpa`, `success`
+- **Passing:** `air_yards`, `yards_after_catch`, `complete_pass`, `pass_touchdown`, `interception`, `pass_length`, `pass_location`
+- **Pressure:** `qb_hit`, `sack`, `qb_scramble`, `time_to_throw`
+- **Expected:** `xyac_epa`, `xpass`, `pass_oe`
+- **Receiver:** `receiver_player_name`, `target_share`, `air_yards_share`
+
+#### Example Field Values:
+| Field | Example Value | Meaning |
+|-------|---------------|----------|
+| `epa` | `+2.3` | Added 2.3 expected points (great play) |
+| `cpoe` | `+8.2` | 8.2% more likely to complete than expected |
+| `air_yards` | `45` | Threw 45 yards in the air |
+| `yards_after_catch` | `12` | Receiver gained 12 yards after catch |
+| `qb_hit` | `1` | QB was hit on this play |
+| `success` | `1` | Play was successful (gained expected value) |
+| `pass_location` | `"middle"` | Pass was to the middle of the field |
+| `pass_length` | `"deep"` | Deep pass (> 20 yards) |
+
+### Complete Documentation
+For full field descriptions, data types, and usage examples, see:
+
+**[PLAYBYPLAY_FIELDS_GUIDE.md](PLAYBYPLAY_FIELDS_GUIDE.md)**
+
+The separate guide includes:
+- All 131 fields with descriptions and examples
+- Field categories (EPA, passing, rushing, situational, etc.)
+- Common query patterns for play-by-play analysis
+- Analysis ideas and use cases
+- Database index information
+
+### Key Insights
+- **754,858 plays:** Complete play-by-play for 16 seasons
+- **546 unique QBs:** From starters to backup appearances
+- **Indexed fields:** Fast queries on `passer_id`, `season`, `week`, `game_id`, `play_type`
+- **Join key:** Use `player_name` to join with other tables
+- **QB plays:** Filter with `qb_dropback = 1` to get QB-specific plays (327,577 plays)
+
+### Use Cases
+- Play-level EPA analysis (situational performance)
+- Air yards vs YAC breakdowns
+- Pressure metrics (sacks, hits, scrambles)
+- Target distribution (which receivers get targets)
+- Game situation analysis (3rd down, red zone, 2-minute drill)
+- Build custom aggregations (last 4 weeks, vs specific defenses, etc.)
+
+---
+
+## Database Schema & Relationships
+
+### Table Hierarchy by Granularity
+
+**Season-level tables** (one row per QB per season):  
+- `espn_qbr` - QBR components and EPA
+- `nflelo_qb_rankings` - Comprehensive stats with ELO ratings
+
+**Week-level tables** (one row per QB per week):  
+- `next_gen_stats` - Advanced tracking metrics (week 0 = season total)
+- `qb_statistics` - Game logs with EPA and CPOE
+
+**Contract-level tables** (one row per contract):  
+- `player_contracts` - Salary and biographical info
+
+**Play-level tables** (one row per play):  
+- `play_by_play` - Every play with full context and analytics
+
+### Join Relationships
+
+```
+espn_qbr
+    |-- player_name / player_id / Season
+    |
+next_gen_stats
+    |-- player_name / player_id / season / week
+    |
+nflelo_qb_rankings
+    |-- player_name / player_id / Season
+    |
+qb_statistics
+    |-- player_name / player_id / season / week
+    |
+player_contracts
+    |-- player_name / player_id
+    |
+play_by_play
+    |-- player_name / passer_player_id / season / week
+```
+
+### Primary Join Keys
+
+| Join Type | Use These Fields | Notes |
+|-----------|------------------|-------|
+| **Cross-table QB identification** | `player_name` or `player_id` | Both work; `player_id` is more reliable |
+| **Season aggregation** | `Season` or `season` | Some tables capitalize, some don't |
+| **Week matching** | `week` | Only in weekly tables (qb_statistics, next_gen_stats) |
+| **Game matching** | `game_id` | Only in play_by_play |
+
+### Important Notes
+
+1. **player_name vs player_id:**
+   - `player_name`: Full name like "Patrick Mahomes" (standardized across all tables)
+   - `player_id`: GSIS ID like "00-0033873" (unique, never changes)
+   - `passer_player_name`: Abbreviated in play_by_play only (e.g., "P.Mahomes")
+
+2. **Season field naming:**
+   - `Season` (capitalized): `espn_qbr`, `nflelo_qb_rankings`
+   - `season` (lowercase): All other tables
+
+3. **Week 0 in next_gen_stats:**
+   - `week = 0` represents season totals
+   - Use this for season-level joins with other tables
+
+4. **Contract matching:**
+   - Use `is_active = 1` to get current contracts only
+   - Multiple contracts per player possible (extensions, new teams)
+
+### Sample Multi-Table Join
+
+```sql
+-- Comprehensive QB profile: season stats + contracts + advanced metrics
+SELECT 
+    qs.player_name,
+    qs.season,
+    -- Weekly stats aggregated
+    COUNT(*) as games,
+    SUM(qs.passing_yards) as total_yards,
+    SUM(qs.passing_tds) as total_tds,
+    ROUND(AVG(qs.passing_epa), 2) as avg_game_epa,
+    -- Season-level advanced metrics
+    eq.QBR,
+    eq.PAA as points_above_avg,
+    nelo."QB Elo" as elo_rating,
+    nelo."ANY/A" as any_a,
+    ngs.completion_percentage_above_expectation as cpoe_season,
+    ngs.avg_time_to_throw,
+    -- Contract
+    ROUND(pc.apy, 1) as salary_apy_millions,
+    ROUND(pc.apy_cap_pct * 100, 1) as cap_pct
+FROM qb_statistics qs
+LEFT JOIN espn_qbr eq 
+    ON qs.player_name = eq.player_name AND qs.season = eq.Season
+LEFT JOIN nflelo_qb_rankings nelo 
+    ON qs.player_name = nelo.player_name AND qs.season = nelo.Season
+LEFT JOIN next_gen_stats ngs 
+    ON qs.player_name = ngs.player_name AND qs.season = ngs.season AND ngs.week = 0
+LEFT JOIN player_contracts pc 
+    ON qs.player_name = pc.player_name AND pc.is_active = 1
+WHERE qs.season = 2024 AND qs.season_type = 'REG'
+GROUP BY 
+    qs.player_name, qs.season, 
+    eq.QBR, eq.PAA, 
+    nelo."QB Elo", nelo."ANY/A",
+    ngs.completion_percentage_above_expectation, ngs.avg_time_to_throw,
+    pc.apy, pc.apy_cap_pct
+HAVING games >= 5
+ORDER BY avg_game_epa DESC;
+```
+
+---
+
+## Quick Start Guide
+
+### Connecting to the Database
+
+**Python:**
+```python
+import sqlite3
+import pandas as pd
+
+# Connect to database
+conn = sqlite3.connect('c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db')
+
+# Query and load into DataFrame
+df = pd.read_sql_query("SELECT * FROM espn_qbr WHERE Season = 2024", conn)
+
+conn.close()
+```
+
+**SQLite Command Line:**
+```bash
+sqlite3 "c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db"
+```
+
+### Quick Queries to Get Started
+
+**1. See all tables:**
+```sql
+SELECT name FROM sqlite_master WHERE type='table';
+```
+
+**2. Count rows in each table:**
+```sql
+SELECT 'espn_qbr' as table_name, COUNT(*) as rows FROM espn_qbr
+UNION ALL
+SELECT 'next_gen_stats', COUNT(*) FROM next_gen_stats
+UNION ALL
+SELECT 'nflelo_qb_rankings', COUNT(*) FROM nflelo_qb_rankings
+UNION ALL
+SELECT 'qb_statistics', COUNT(*) FROM qb_statistics
+UNION ALL
+SELECT 'player_contracts', COUNT(*) FROM player_contracts
+UNION ALL
+SELECT 'play_by_play', COUNT(*) FROM play_by_play;
+```
+
+**3. Top 10 QBs by EPA (2024):**
+```sql
+SELECT player_name, SUM(passing_epa) as total_epa, COUNT(*) as games
+FROM qb_statistics
+WHERE season = 2024 AND season_type = 'REG'
+GROUP BY player_name
+HAVING games >= 5
+ORDER BY total_epa DESC
+LIMIT 10;
+```
+
+**4. QB salaries vs performance:**
+```sql
+SELECT 
+    pc.player_name,
+    ROUND(pc.apy, 1) as salary_m,
+    eq.QBR,
+    eq.EPA as total_epa
+FROM player_contracts pc
+JOIN espn_qbr eq ON pc.player_name = eq.player_name
+WHERE pc.is_active = 1 AND eq.Season = 2024
+ORDER BY pc.apy DESC;
+```
+
+### Common Filters
+
+**Regular season only:**
+```sql
+WHERE season_type = 'REG'
+```
+
+**Starters only (minimum attempts):**
+```sql
+WHERE attempts >= 300  -- for season-level
+WHERE attempts >= 10   -- for game-level
+```
+
+**Active contracts:**
+```sql
+WHERE is_active = 1
+```
+
+**QB dropbacks in play-by-play:**
+```sql
+WHERE qb_dropback = 1
+```
+
+**Recent seasons:**
+```sql
+WHERE season >= 2021
+```
+
+### Performance Tips
+
+1. **Always filter by season first** when querying play_by_play (754K rows is large)
+2. **Use indexes** - already created on key fields (passer_id, season, week, game_id)
+3. **Aggregate play-by-play** before joining with other tables (don't join 754K rows)
+4. **Use LEFT JOIN** instead of INNER JOIN to avoid losing QBs missing in some tables
+5. **Filter season_type = 'REG'** unless you want postseason/preseason
+
+### Need Help?
+
+- **Play-by-play fields:** See [PLAYBYPLAY_FIELDS_GUIDE.md](PLAYBYPLAY_FIELDS_GUIDE.md)
+- **Database issues:** Check file path and permissions
+- **Missing data:** See Data Completeness section above
+- **Join errors:** Verify `player_name` spelling and season field capitalization
