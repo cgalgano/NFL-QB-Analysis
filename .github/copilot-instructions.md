@@ -7,3 +7,4 @@
 
 ## Code Practices
 - Do not put unnecessary print statements.
+- Do not make everything look so bloated and AI generated. no emojis.
