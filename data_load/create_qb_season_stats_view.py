@@ -89,14 +89,11 @@ season_agg AS (
         AVG(interception) AS turnover_rate,
         AVG(pass_touchdown) AS td_rate,
         
-        -- VOLUME STATS
-        SUM(passing_yards) AS passing_yards,
-        SUM(pass_touchdown) AS passing_tds,
+        -- VOLUME STATS (per game)
         SUM(rush_attempt) AS rush_attempts,
-        SUM(rushing_yards) AS total_rushing_yards,
-        SUM(rush_touchdown) AS rushing_tds,
         SUM(rushing_yards) / 17.0 AS rush_yards_per_game,
-        SUM(pass_touchdown) + SUM(rush_touchdown) AS total_tds,
+        SUM(passing_yards) / 17.0 AS pass_yards_per_game,
+        (SUM(pass_touchdown) + SUM(rush_touchdown)) / 17.0 AS total_tds_per_game,
         
         -- CLUTCH/WPA
         SUM(wpa) AS total_wpa,
@@ -106,59 +103,63 @@ season_agg AS (
     GROUP BY player_name, player_id, season
 )
 
--- Final view with NULL handling for low-volume situations
+-- Final view with NULL handling and Next Gen Stats join
 SELECT 
-    player_name,
-    player_id,
-    season,
-    attempts,
+    s.player_name,
+    s.player_id,
+    s.season,
+    s.attempts,
     
     -- Passing metrics
-    COALESCE(total_pass_epa, 0) AS total_pass_epa,
-    COALESCE(pass_success_rate, 0) AS pass_success_rate,
-    COALESCE(cpoe, 0) AS cpoe,
-    COALESCE(completion_pct, 0) AS completion_pct,
+    COALESCE(s.total_pass_epa, 0) AS total_pass_epa,
+    COALESCE(s.pass_success_rate, 0) AS pass_success_rate,
+    COALESCE(s.cpoe, 0) AS cpoe,
+    COALESCE(s.completion_pct, 0) AS completion_pct,
+    
+    -- Next Gen Stats (NULL for seasons before 2016 when tracking started)
+    CASE WHEN s.season >= 2016 THEN ngs.avg_time_to_throw ELSE NULL END AS avg_time_to_throw,
     
     -- Rushing metrics (set to 0 if <5 rush attempts)
-    CASE WHEN rush_attempts >= 5 THEN COALESCE(rush_epa_per_play, 0) ELSE 0 END AS rush_epa_per_play,
-    CASE WHEN rush_attempts >= 5 THEN COALESCE(total_rush_epa, 0) ELSE 0 END AS total_rush_epa,
-    CASE WHEN rush_attempts >= 5 THEN COALESCE(rush_success_rate, 0) ELSE 0 END AS rush_success_rate,
+    CASE WHEN s.rush_attempts >= 5 THEN COALESCE(s.rush_epa_per_play, 0) ELSE 0 END AS rush_epa_per_play,
+    CASE WHEN s.rush_attempts >= 5 THEN COALESCE(s.total_rush_epa, 0) ELSE 0 END AS total_rush_epa,
+    CASE WHEN s.rush_attempts >= 5 THEN COALESCE(s.rush_success_rate, 0) ELSE 0 END AS rush_success_rate,
     
     -- Situational metrics
-    COALESCE(third_down_success, 0) AS third_down_success,
-    COALESCE(red_zone_epa, 0) AS red_zone_epa,
-    COALESCE(late_close_epa, 0) AS late_close_epa,
+    COALESCE(s.third_down_success, 0) AS third_down_success,
+    COALESCE(s.red_zone_epa, 0) AS red_zone_epa,
+    COALESCE(s.late_close_epa, 0) AS late_close_epa,
     
     -- Pressure metrics
-    COALESCE(pressure_rate, 0) AS pressure_rate,
-    COALESCE(epa_under_pressure, 0) AS epa_under_pressure,
-    COALESCE(sack_rate, 0) AS sack_rate,
+    COALESCE(s.pressure_rate, 0) AS pressure_rate,
+    COALESCE(s.epa_under_pressure, 0) AS epa_under_pressure,
+    COALESCE(s.sack_rate, 0) AS sack_rate,
     
     -- Ball distribution
-    COALESCE(avg_air_yards, 0) AS avg_air_yards,
-    COALESCE(deep_pass_rate, 0) AS deep_pass_rate,
-    COALESCE(avg_yac, 0) AS avg_yac,
+    COALESCE(s.avg_air_yards, 0) AS avg_air_yards,
+    COALESCE(s.deep_pass_rate, 0) AS deep_pass_rate,
+    COALESCE(s.avg_yac, 0) AS avg_yac,
     
     -- Decision making
-    COALESCE(turnover_rate, 0) AS turnover_rate,
-    COALESCE(td_rate, 0) AS td_rate,
+    COALESCE(s.turnover_rate, 0) AS turnover_rate,
+    COALESCE(s.td_rate, 0) AS td_rate,
     
-    -- Volume stats
-    COALESCE(passing_yards, 0) AS passing_yards,
-    COALESCE(passing_tds, 0) AS passing_tds,
-    COALESCE(rush_attempts, 0) AS rush_attempts,
-    COALESCE(total_rushing_yards, 0) AS total_rushing_yards,
-    COALESCE(rushing_tds, 0) AS rushing_tds,
-    COALESCE(rush_yards_per_game, 0) AS rush_yards_per_game,
-    COALESCE(total_tds, 0) AS total_tds,
+    -- Volume stats (per game)
+    COALESCE(s.rush_attempts, 0) AS rush_attempts,
+    COALESCE(s.rush_yards_per_game, 0) AS rush_yards_per_game,
+    COALESCE(s.pass_yards_per_game, 0) AS pass_yards_per_game,
+    COALESCE(s.total_tds_per_game, 0) AS total_tds_per_game,
     
     -- Clutch metrics
-    COALESCE(total_wpa, 0) AS total_wpa,
-    COALESCE(high_leverage_epa, 0) AS high_leverage_epa
+    COALESCE(s.total_wpa, 0) AS total_wpa,
+    COALESCE(s.high_leverage_epa, 0) AS high_leverage_epa
 
-FROM season_agg
-WHERE attempts >= 150  -- Filter to meaningful sample sizes
-ORDER BY season DESC, total_pass_epa DESC;
+FROM season_agg s
+LEFT JOIN next_gen_stats ngs 
+    ON s.player_id = ngs.player_id 
+    AND s.season = ngs.season 
+    AND ngs.week = 0
+WHERE s.attempts >= 225  -- Filter to meaningful sample sizes (roughly 13+ games started)
+ORDER BY s.season DESC, s.total_pass_epa DESC;
 """
 
 print("="*80)

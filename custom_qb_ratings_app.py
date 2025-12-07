@@ -131,7 +131,7 @@ def load_data():
     SELECT 
         player_id,
         season,
-        passing_yards * 1.0 / attempts as yards_per_attempt
+        (pass_yards_per_game * 17.0) / attempts as yards_per_attempt
     FROM qb_season_stats
     """
     ya_df = pd.read_sql(ya_query, conn)
@@ -221,8 +221,8 @@ with tabs[0]:
         season_df['Rank'] = season_df.index + 1
     
     show_cols = [
-        'Rank', 'display_name', 'archetype', 'custom_rating', 'mobility_rating', 'aggression_rating',
-        'accuracy_rating', 'ball_security_rating', 'pocket_presence_rating', 'playmaking_rating'
+        'Rank', 'display_name', 'archetype', 'custom_rating', 'playmaking_rating', 'aggression_rating',
+        'accuracy_rating', 'ball_security_rating', 'pocket_presence_rating', 'mobility_rating'
     ]
     rename_dict = {
         'Rank': 'Rank',
@@ -238,8 +238,8 @@ with tabs[0]:
     }
     table = season_df[show_cols].rename(columns=rename_dict)
     gradient_cols = [
-        'Overall Rating', 'Mobility', 'Aggression', 'Accuracy',
-        'Ball Security', 'Pocket Presence', 'Playmaking'
+        'Overall Rating', 'Playmaking', 'Aggression', 'Accuracy',
+        'Ball Security', 'Pocket Presence', 'Mobility'
     ]
     gradient_cols = [col for col in gradient_cols if col in table.columns]
     format_dict = {col: "{:.1f}" for col in gradient_cols}
@@ -264,9 +264,9 @@ with tabs[1]:
         player_df = player_df.merge(df_ranks[['season', 'player_name', 'Rank']], on=['season', 'player_name'], how='left')
         
         show_cols = [
-            'season', 'Rank', 'attempts', 'custom_rating', 'mobility_rating', 'aggression_rating',
+            'season', 'Rank', 'attempts', 'custom_rating', 'playmaking_rating', 'aggression_rating',
             'accuracy_rating', 'ball_security_rating', 'pocket_presence_rating',
-            'playmaking_rating'
+            'mobility_rating'
         ]
         rename_dict = {
             'season': 'Season',
@@ -282,8 +282,8 @@ with tabs[1]:
         }
         table = player_df[show_cols].rename(columns=rename_dict)
         gradient_cols = [
-            'Overall Rating', 'Mobility', 'Aggression', 'Accuracy',
-            'Ball Security', 'Pocket Presence', 'Playmaking'
+            'Overall Rating', 'Playmaking', 'Aggression', 'Accuracy',
+            'Ball Security', 'Pocket Presence', 'Mobility'
         ]
         format_dict = {col: "{:.1f}" for col in gradient_cols}
         format_dict['Rank'] = "{:.0f}"
@@ -298,18 +298,18 @@ with tabs[1]:
         st.subheader(f"Playstyle Profile: {player}")
         
         # Create radar chart using plotly
-        categories = ['Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket Presence', 'Playmaking']
+        categories = ['Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket Presence', 'Mobility']
         
         fig = go.Figure()
         
         for _, row in player_df.iterrows():
             values = [
-                row['mobility_rating'],
+                row['playmaking_rating'],
                 row['aggression_rating'],
                 row['accuracy_rating'],
                 row['ball_security_rating'],
                 row['pocket_presence_rating'],
-                row['playmaking_rating']
+                row['mobility_rating']
             ]
             values_closed = values + [values[0]]
             categories_closed = categories + [categories[0]]
