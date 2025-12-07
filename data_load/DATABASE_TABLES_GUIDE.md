@@ -18,7 +18,7 @@ This database supports multi-dimensional quarterback analysis by providing play-
 
 ## Database Schema & Relationships
 
-![QB Database ERD](updated_qb_erd.png)
+![QB Database ERD](Updated_QB_ERD.png)
 
 ### Table Hierarchy by Granularity
 
