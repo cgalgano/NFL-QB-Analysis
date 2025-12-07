@@ -4,16 +4,15 @@ Custom quarterback rating system built from 754,858 play-by-play records, analyz
 
 ## Project Overview
 
-Existing QB rating systems (NFL Passer Rating, QBR, ELO) each capture important aspects of quarterback play, but none provide a complete picture. This project develops a custom rating system by analyzing these established models alongside raw play-by-play data to better evaluate modern quarterback performance.
+I am a huge football/NFL fan and Quarterback rankings are always a constant topic of debate among fans. Existing QB rating systems (NFL Passer Rating, QBR, ELO) each capture important aspects of quarterback play, but none provide a complete picture. So, I created this project that develops a custom rating system by analyzing these established models alongside raw play-by-play data to better evaluate modern quarterback performance.
 
-QB rankings are a constant topic of debate among football fans and analysts. This project aims to contribute to that discussion by building a data-driven model that accounts for the multi-dimensional nature of quarterback play - passing accuracy, decision-making, mobility, ball security, pocket presence, and playmaking ability.
+I am trying to find stats and other combined features that could be helpful in painting the picture of which qbs are better than others. This project aims to contribute to the discussion by building a data-driven model that accounts for the multi-dimensional nature of quarterback play - passing accuracy, decision-making, mobility, ball security, pocket presence, and playmaking ability. Others will be able to look at my model and ratings to draw conclusions for themselves and expand the project if they feel compelled to.
 
 ### Primary Goal
-Build a custom QB rating system that improves upon existing models by incorporating:
-- Advanced metrics from established rating systems (QBR, ELO)
-- Play-by-play situational data (EPA, CPOE, WPA)
-- Modern tracking technology (Next Gen Stats)
-- Context-aware evaluation across six playstyle dimensions
+Build a custom QB rating system that improves upon existing models by utilizing machine learning and advanced statistics to analyze:
+- Established rating systems (QBR, ELO)
+- Play-by-play situational data (EPA, CPOE, WPA, etc.)
+- Multi-season performance patterns
 
 ### Secondary Goal
 Predict future QB performance and statistics based on historical trends and multi-season patterns.
@@ -63,9 +62,9 @@ uv run streamlit run custom_qb_ratings_app.py
 
 ### Explore Analysis Notebooks
 - `Modeling/custom_qb_rating_system.ipynb` - Rating formula development
+- `Modeling/qb_rating_model_v2.ipynb` - QBR and ELO modeling/feature research
 - `data_load/qb_data_loading.ipynb` - Data ingestion pipeline
 - `data_load/test_qb_database.ipynb` - Database loading
-- `Comprehensive_NFL_QB_Review.ipynb` - Full analysis with archetype logic
 
 ## Database Structure
 
