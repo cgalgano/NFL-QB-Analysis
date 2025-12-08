@@ -54,23 +54,40 @@ def assign_custom_archetype(row):
     if strong_traits == 6:
         return 'Complete All-Around'
     
-    # Special archetypes
+    # Special archetypes - check ball security first if it's elite (93+)
+    if name1 == 'Protective' and val1 >= 93:
+        if name2 == 'Accuracy' and val2 >= 82:
+            return 'Efficient Ball Protector'
+        elif name2 == 'Mobility' and val2 >= 82:
+            return 'Safe Ball Handler'
+        elif name2 == 'Aggression' and val2 >= 82:
+            return 'Aggressive Ball Protector'
+        else:
+            return 'Ball Protector'
+    
     if name1 == 'Mobility' and val1 >= 82:
         return 'Dynamic Rusher'
     if name1 == 'Accuracy' and val1 >= 82:
         return 'Precision Passer'
-    if name1 == 'Aggression' and name2 == 'Playmaking' and val1 >= 82 and val2 >= 82:
-        return 'Aggressive Playmaker'
     if name1 == 'Aggression' and val1 >= 82:
         return 'Gunslinger'
-    if name1 == 'Playmaking' and val1 >= 82:
-        return 'Playmaker'
-    if name1 == 'Protective' and name2 == 'Accuracy' and val1 >= 95 and val2 >= 82:
-        return 'Efficient Ball Protector'
-    if name1 == 'Mobility' and name2 == 'Protective' and val1 >= 82 and val2 >= 95:
+    if name1 == 'Mobility' and name2 == 'Protective' and val1 >= 82 and val2 >= 93:
         return 'Safe Ball Handler'
     if name1 == 'Poise' and val1 >= 82:
         return 'Pressure Resistant'
+    
+    # If playmaking is highest, use second trait instead
+    if name1 == 'Playmaking':
+        if name2 == 'Aggression' and val2 >= 82:
+            return 'Gunslinger'
+        elif name2 == 'Accuracy' and val2 >= 82:
+            return 'Precision Passer'
+        elif name2 == 'Mobility' and val2 >= 82:
+            return 'Dynamic Rusher'
+        elif name2 == 'Protective' and val2 >= 85:
+            return 'Efficient Passer'
+        else:
+            return 'Efficient Passer'
     
     # Combo archetypes
     if name1 == 'Accuracy' and name2 == 'Protective' and val1 >= 73 and val2 >= 92:
@@ -86,29 +103,25 @@ def assign_custom_archetype(row):
                 return 'Safe Ball Handler'
             if name2 == 'Accuracy':
                 return 'Efficient Ball Protector'
-        # Otherwise redirect to generic archetypes based on second trait (avoid any "protector" label)
+        # Otherwise redirect to generic archetypes based on second trait
         if name2 == 'Accuracy':
             return 'Accurate Passer'
         elif name2 == 'Mobility':
-            return 'Mobile Playmaker'
-        elif name2 == 'Playmaking':
-            return 'Playmaker'
+            return 'Mobile Passer'
         elif name2 == 'Aggression':
             return 'Aggressive Passer'
         else:
             return 'Poised Passer'
     if name1 == 'Aggression':
         return 'Aggressive Passer'
-    if name1 == 'Playmaking':
-        return 'Playmaker'
     if name1 == 'Accuracy':
         return 'Accurate Passer'
     if name1 == 'Mobility':
-        return 'Mobile Playmaker'
+        return 'Mobile Passer'
     if name1 == 'Poise':
         return 'Poised Passer'
-    # Final fallback - avoid "Protective" in the name
-    return f"Balanced Passer" if name1 == 'Protective' else f"Developing {name1}"
+    # Final fallback
+    return f"Balanced Passer" if name1 == 'Protective' else f"Efficient Passer"
 
 # --- Load Data ---
 @st.cache_data
@@ -117,6 +130,9 @@ def load_data():
     
     # Load custom ratings
     df = pd.read_csv('Modeling/models/custom_qb_ratings.csv')
+    
+    # Remove duplicates - keep the entry with more attempts for each player_id + season combination
+    df = df.sort_values('attempts', ascending=False).drop_duplicates(subset=['player_id', 'season'], keep='first')
     
     # Load composite ratings from ML model
     composite_df = pd.read_csv('Modeling/models/qb_composite_ratings.csv')
@@ -189,11 +205,11 @@ def rating_explanation():
 st.set_page_config(page_title="Custom NFL QB Rankings", layout="wide")
 st.title("🏈 Custom NFL QB Rankings (2010-2025)")
 
-tabs = st.tabs(["Top 32 QBs", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite"])
+tabs = st.tabs(["Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map"])
 
 # --- Tab 1: Top 32 QBs Table ---
 with tabs[0]:
-    st.header("Top 32 QBs (Custom Rating System)")
+    st.header("Top 32 QBs - Custom Ratings & Playstyle Profiles")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", options=all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], format_func=str, key="year_filter_tab0")
     filtered_df = df[df['season'].isin(selected_years)]
@@ -258,10 +274,17 @@ with tabs[1]:
     player_df = df[df['display_name'] == player].sort_values('season')
     
     if not player_df.empty:
+        # Ensure no duplicates in player_df before processing
+        player_df = player_df.drop_duplicates(subset=['season', 'player_id'], keep='first')
+        
         # Compute rank for each season (by custom_rating, descending)
         df_ranks = df[df['season'].isin(player_df['season'])].copy()
         df_ranks['Rank'] = df_ranks.groupby('season')['custom_rating'].rank(ascending=False, method='min')
-        player_df = player_df.merge(df_ranks[['season', 'player_name', 'Rank']], on=['season', 'player_name'], how='left')
+        
+        # Ensure df_ranks has no duplicates before merging
+        df_ranks = df_ranks.drop_duplicates(subset=['season', 'player_id'], keep='first')
+        
+        player_df = player_df.merge(df_ranks[['season', 'player_id', 'Rank']], on=['season', 'player_id'], how='left')
         
         show_cols = [
             'season', 'Rank', 'attempts', 'custom_rating', 'playmaking_rating', 'aggression_rating',
@@ -295,31 +318,35 @@ with tabs[1]:
         st.dataframe(styled, use_container_width=True, height=600)
         
         # Show radar chart for selected player
-        st.subheader(f"Playstyle Profile: {player}")
+        st.subheader(f"Career Average Playstyle Profile: {player}")
         
-        # Create radar chart using plotly
+        # Create radar chart using plotly - career averages
         categories = ['Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket Presence', 'Mobility']
+        
+        # Calculate career averages
+        avg_values = [
+            player_df['playmaking_rating'].mean(),
+            player_df['aggression_rating'].mean(),
+            player_df['accuracy_rating'].mean(),
+            player_df['ball_security_rating'].mean(),
+            player_df['pocket_presence_rating'].mean(),
+            player_df['mobility_rating'].mean()
+        ]
+        
+        values_closed = avg_values + [avg_values[0]]
+        categories_closed = categories + [categories[0]]
         
         fig = go.Figure()
         
-        for _, row in player_df.iterrows():
-            values = [
-                row['playmaking_rating'],
-                row['aggression_rating'],
-                row['accuracy_rating'],
-                row['ball_security_rating'],
-                row['pocket_presence_rating'],
-                row['mobility_rating']
-            ]
-            values_closed = values + [values[0]]
-            categories_closed = categories + [categories[0]]
-            
-            fig.add_trace(go.Scatterpolar(
-                r=values_closed,
-                theta=categories_closed,
-                fill='toself',
-                name=str(row['season'])
-            ))
+        fig.add_trace(go.Scatterpolar(
+            r=values_closed,
+            theta=categories_closed,
+            fill='toself',
+            line_color='steelblue',
+            fillcolor='steelblue',
+            opacity=0.6,
+            name='Career Average'
+        ))
         
         fig.update_layout(
             polar=dict(
@@ -331,8 +358,8 @@ with tabs[1]:
                     dtick=10
                 )
             ),
-            showlegend=True,
-            title=f"{player} - Playstyle Evolution"
+            showlegend=False,
+            title=f"{player} - Career Average Playstyle"
         )
         
         st.plotly_chart(fig, use_container_width=True)
@@ -415,130 +442,168 @@ with tabs[3]:
     st.header("Total Pass EPA vs CPOE Scatter Plot")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab3")
-    filtered_df = df[df['season'].isin(selected_years)]
     
-    fig = px.scatter(
-        filtered_df,
-        x='cpoe',
-        y='total_pass_epa',
-        text='display_name',
-        color='custom_rating',
-        color_continuous_scale='RdYlGn',
-        range_color=[50, 100],
-        labels={
-            'cpoe': 'CPOE (Completion % Over Expected)',
-            'total_pass_epa': 'Total Pass EPA',
-            'custom_rating': 'Custom Rating',
-            'season': 'Season'
-        },
-        hover_data=['season', 'custom_rating', 'display_name']
-    )
-    fig.update_traces(textposition='top center', marker=dict(size=14, line=dict(width=1, color='DarkSlateGrey')))
+    # Aggregate data by player across selected seasons
+    if selected_years:
+        filtered_df = df[df['season'].isin(selected_years)].copy()
+        
+        # Group by player and aggregate
+        agg_df = filtered_df.groupby('display_name').agg({
+            'cpoe': 'mean',
+            'total_pass_epa': 'sum',  # Sum EPA across seasons
+            'custom_rating': 'mean',
+            'attempts': 'sum'
+        }).reset_index()
+        
+        # Filter for minimum attempts (at least 225 per season on average)
+        min_attempts = 225 * len(selected_years)
+        agg_df = agg_df[agg_df['attempts'] >= min_attempts]
+    else:
+        agg_df = pd.DataFrame()
     
-    # Add quadrant lines
-    median_epa = filtered_df['total_pass_epa'].median()
-    median_cpoe = filtered_df['cpoe'].median()
-    fig.add_shape(type="line", x0=median_cpoe, x1=median_cpoe, y0=filtered_df['total_pass_epa'].min(), y1=filtered_df['total_pass_epa'].max(),
-                  line=dict(color="gray", dash="dash"))
-    fig.add_shape(type="line", x0=filtered_df['cpoe'].min(), x1=filtered_df['cpoe'].max(), y0=median_epa, y1=median_epa,
-                  line=dict(color="gray", dash="dash"))
-    
-    # Add quadrant labels
-    fig.add_annotation(x=filtered_df['cpoe'].max(), y=filtered_df['total_pass_epa'].max(),
-        text="Elite<br>(High EPA & CPOE)", showarrow=False, xanchor="right", yanchor="top",
-        font=dict(size=13, color="green"), bgcolor="rgba(0,255,0,0.08)")
-    fig.add_annotation(x=filtered_df['cpoe'].min(), y=filtered_df['total_pass_epa'].max(),
-        text="High EPA<br>Low CPOE", showarrow=False, xanchor="left", yanchor="top",
-        font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
-    fig.add_annotation(x=filtered_df['cpoe'].max(), y=filtered_df['total_pass_epa'].min(),
-        text="High CPOE<br>Low EPA", showarrow=False, xanchor="right", yanchor="bottom",
-        font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
-    fig.add_annotation(x=filtered_df['cpoe'].min(), y=filtered_df['total_pass_epa'].min(),
-        text="Below Average", showarrow=False, xanchor="left", yanchor="bottom",
-        font=dict(size=13, color="red"), bgcolor="rgba(255,0,0,0.08)")
-    
-    fig.update_layout(height=700, xaxis_title="CPOE (Completion % Over Expected)", yaxis_title="Total Pass EPA")
-    st.plotly_chart(fig, use_container_width=True)
-    
-    st.markdown("""
-    **Quadrant Interpretation:**
-    
-    - **Upper-right:** Elite (High EPA & CPOE) - Most accurate AND most effective
-    - **Upper-left:** High EPA, Low CPOE - Volume throwers who produce despite lower accuracy
-    - **Lower-right:** High CPOE, Low EPA - Accurate but not producing value (short passes?)
-    - **Lower-left:** Below Average - Neither accurate nor effective
-    
-    **Total Pass EPA** = Sum of Expected Points Added on all passing plays
-    **CPOE** = Completion % Over Expected (how accurate relative to pass difficulty)
-    """)
+    if not agg_df.empty:
+        fig = px.scatter(
+            agg_df,
+            x='cpoe',
+            y='total_pass_epa',
+            text='display_name',
+            color='custom_rating',
+            color_continuous_scale='RdYlGn',
+            range_color=[50, 100],
+            labels={
+                'cpoe': 'CPOE (Completion % Over Expected)',
+                'total_pass_epa': 'Total Pass EPA',
+                'custom_rating': 'Custom Rating'
+            },
+            hover_data=['custom_rating', 'display_name', 'attempts']
+        )
+        fig.update_traces(textposition='top center', marker=dict(size=14, line=dict(width=1, color='DarkSlateGrey')))
+        
+        # Add quadrant lines
+        median_epa = agg_df['total_pass_epa'].median()
+        median_cpoe = agg_df['cpoe'].median()
+        fig.add_shape(type="line", x0=median_cpoe, x1=median_cpoe, y0=agg_df['total_pass_epa'].min(), y1=agg_df['total_pass_epa'].max(),
+                      line=dict(color="gray", dash="dash"))
+        fig.add_shape(type="line", x0=agg_df['cpoe'].min(), x1=agg_df['cpoe'].max(), y0=median_epa, y1=median_epa,
+                      line=dict(color="gray", dash="dash"))
+        
+        # Add quadrant labels
+        fig.add_annotation(x=agg_df['cpoe'].max(), y=agg_df['total_pass_epa'].max(),
+            text="Elite<br>(High EPA & CPOE)", showarrow=False, xanchor="right", yanchor="top",
+            font=dict(size=13, color="green"), bgcolor="rgba(0,255,0,0.08)")
+        fig.add_annotation(x=agg_df['cpoe'].min(), y=agg_df['total_pass_epa'].max(),
+            text="High EPA<br>Low CPOE", showarrow=False, xanchor="left", yanchor="top",
+            font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
+        fig.add_annotation(x=agg_df['cpoe'].max(), y=agg_df['total_pass_epa'].min(),
+            text="High CPOE<br>Low EPA", showarrow=False, xanchor="right", yanchor="bottom",
+            font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
+        fig.add_annotation(x=agg_df['cpoe'].min(), y=agg_df['total_pass_epa'].min(),
+            text="Below Average", showarrow=False, xanchor="left", yanchor="bottom",
+            font=dict(size=13, color="red"), bgcolor="rgba(255,0,0,0.08)")
+        
+        fig.update_layout(height=700, xaxis_title="CPOE (Completion % Over Expected)", yaxis_title="Total Pass EPA")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        st.markdown("""
+        **Quadrant Interpretation:**
+        
+        - **Upper-right:** Elite (High EPA & CPOE) - Most accurate AND most effective
+        - **Upper-left:** High EPA, Low CPOE - Volume throwers who produce despite lower accuracy
+        - **Lower-right:** High CPOE, Low EPA - Accurate but not producing value (short passes?)
+        - **Lower-left:** Below Average - Neither accurate nor effective
+        
+        **Total Pass EPA** = Sum of Expected Points Added on all passing plays
+        **CPOE** = Completion % Over Expected (how accurate relative to pass difficulty)
+        """)
+    else:
+        st.warning("No data available for selected seasons")
 
 # --- Tab 5: Sack Rate vs Yards/Attempt Scatter Plot ---
 with tabs[4]:
     st.header("Sack Rate vs Yards/Attempt Scatter Plot")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab5")
-    filtered_df = df[df['season'].isin(selected_years)].copy()
     
-    # Invert sack rate for plotting (so lower sack rate is to the right)
-    filtered_df['inv_sack_rate'] = -filtered_df['sack_rate']
+    # Aggregate data by player across selected seasons
+    if selected_years:
+        filtered_df = df[df['season'].isin(selected_years)].copy()
+        
+        # Group by player and aggregate
+        agg_df = filtered_df.groupby('display_name').agg({
+            'sack_rate': 'mean',
+            'yards_per_attempt': 'mean',
+            'custom_rating': 'mean',
+            'attempts': 'sum'
+        }).reset_index()
+        
+        # Filter for minimum attempts
+        min_attempts = 225 * len(selected_years)
+        agg_df = agg_df[agg_df['attempts'] >= min_attempts]
+        
+        # Invert sack rate for plotting (so lower sack rate is to the right)
+        agg_df['inv_sack_rate'] = -agg_df['sack_rate']
+    else:
+        agg_df = pd.DataFrame()
     
-    fig2 = px.scatter(
-        filtered_df,
-        x='inv_sack_rate',
-        y='yards_per_attempt',
-        text='display_name',
-        color='custom_rating',
-        color_continuous_scale='RdYlGn',
-        range_color=[50, 100],
-        labels={
-            'inv_sack_rate': 'Sack Rate (Inverted - Lower is Right)',
-            'yards_per_attempt': 'Yards per Attempt',
-            'custom_rating': 'Custom Rating',
-            'season': 'Season'
-        },
-        hover_data=['season', 'custom_rating', 'sack_rate', 'display_name']
-    )
-    fig2.update_traces(textposition='top center', marker=dict(size=14, line=dict(width=1, color='DarkSlateGrey')))
-    
-    # Add quadrant lines
-    median_inv_sack = filtered_df['inv_sack_rate'].median()
-    median_ya = filtered_df['yards_per_attempt'].median()
-    fig2.add_shape(type="line", x0=median_inv_sack, x1=median_inv_sack, 
-                   y0=filtered_df['yards_per_attempt'].min(), y1=filtered_df['yards_per_attempt'].max(),
-                   line=dict(color="gray", dash="dash"))
-    fig2.add_shape(type="line", x0=filtered_df['inv_sack_rate'].min(), x1=filtered_df['inv_sack_rate'].max(), 
-                   y0=median_ya, y1=median_ya,
-                   line=dict(color="gray", dash="dash"))
-    
-    # Add quadrant labels
-    fig2.add_annotation(x=filtered_df['inv_sack_rate'].max(), y=filtered_df['yards_per_attempt'].max(),
-        text="Elite<br>(Low Sacks, High Y/A)", showarrow=False, xanchor="right", yanchor="top",
-        font=dict(size=13, color="green"), bgcolor="rgba(0,255,0,0.08)")
-    fig2.add_annotation(x=filtered_df['inv_sack_rate'].min(), y=filtered_df['yards_per_attempt'].max(),
-        text="High Risk High Reward<br>(High Sacks, High Y/A)", showarrow=False, xanchor="left", yanchor="top",
-        font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
-    fig2.add_annotation(x=filtered_df['inv_sack_rate'].max(), y=filtered_df['yards_per_attempt'].min(),
-        text="Conservative<br>(Low Sacks, Low Y/A)", showarrow=False, xanchor="right", yanchor="bottom",
-        font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
-    fig2.add_annotation(x=filtered_df['inv_sack_rate'].min(), y=filtered_df['yards_per_attempt'].min(),
-        text="High Risk Low Reward<br>(High Sacks, Low Y/A)", showarrow=False, xanchor="left", yanchor="bottom",
-        font=dict(size=13, color="red"), bgcolor="rgba(255,0,0,0.08)")
-    
-    fig2.update_layout(height=700, xaxis_title="Sack Rate (Inverted: Lower Sack Rate = Right)", 
-                       yaxis_title="Yards per Attempt")
-    st.plotly_chart(fig2, use_container_width=True)
-    
-    st.markdown("""
-    **Quadrant Interpretation:**
-    
-    - **Upper-right:** Elite (Low Sacks, High Y/A) - Protecting the ball AND throwing downfield
-    - **Upper-left:** High Risk High Reward (High Sacks, High Y/A) - Aggressive downfield but taking sacks
-    - **Lower-right:** Conservative (Low Sacks, Low Y/A) - Safe, short passes with good protection
-    - **Lower-left:** High Risk Low Reward (High Sacks, Low Y/A) - Taking sacks without downfield production
-    
-    **Sack Rate** = Sacks / (Pass Attempts + Sacks)  
-    **Y/A** = Yards per Attempt (downfield aggressiveness and completion efficiency)
-    """)
+    if not agg_df.empty:
+        fig2 = px.scatter(
+            agg_df,
+            x='inv_sack_rate',
+            y='yards_per_attempt',
+            text='display_name',
+            color='custom_rating',
+            color_continuous_scale='RdYlGn',
+            range_color=[50, 100],
+            labels={
+                'inv_sack_rate': 'Sack Rate (Inverted - Lower is Right)',
+                'yards_per_attempt': 'Yards per Attempt',
+                'custom_rating': 'Custom Rating'
+            },
+            hover_data=['custom_rating', 'sack_rate', 'display_name', 'attempts']
+        )
+        fig2.update_traces(textposition='top center', marker=dict(size=14, line=dict(width=1, color='DarkSlateGrey')))
+        
+        # Add quadrant lines
+        median_inv_sack = agg_df['inv_sack_rate'].median()
+        median_ya = agg_df['yards_per_attempt'].median()
+        fig2.add_shape(type="line", x0=median_inv_sack, x1=median_inv_sack, 
+                       y0=agg_df['yards_per_attempt'].min(), y1=agg_df['yards_per_attempt'].max(),
+                       line=dict(color="gray", dash="dash"))
+        fig2.add_shape(type="line", x0=agg_df['inv_sack_rate'].min(), x1=agg_df['inv_sack_rate'].max(), 
+                       y0=median_ya, y1=median_ya,
+                       line=dict(color="gray", dash="dash"))
+        
+        # Add quadrant labels
+        fig2.add_annotation(x=agg_df['inv_sack_rate'].max(), y=agg_df['yards_per_attempt'].max(),
+            text="Elite<br>(Low Sacks, High Y/A)", showarrow=False, xanchor="right", yanchor="top",
+            font=dict(size=13, color="green"), bgcolor="rgba(0,255,0,0.08)")
+        fig2.add_annotation(x=agg_df['inv_sack_rate'].min(), y=agg_df['yards_per_attempt'].max(),
+            text="High Risk High Reward<br>(High Sacks, High Y/A)", showarrow=False, xanchor="left", yanchor="top",
+            font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
+        fig2.add_annotation(x=agg_df['inv_sack_rate'].max(), y=agg_df['yards_per_attempt'].min(),
+            text="Conservative<br>(Low Sacks, Low Y/A)", showarrow=False, xanchor="right", yanchor="bottom",
+            font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
+        fig2.add_annotation(x=agg_df['inv_sack_rate'].min(), y=agg_df['yards_per_attempt'].min(),
+            text="High Risk Low Reward<br>(High Sacks, Low Y/A)", showarrow=False, xanchor="left", yanchor="bottom",
+            font=dict(size=13, color="red"), bgcolor="rgba(255,0,0,0.08)")
+        
+        fig2.update_layout(height=700, xaxis_title="Sack Rate (Inverted: Lower Sack Rate = Right)", 
+                           yaxis_title="Yards per Attempt")
+        st.plotly_chart(fig2, use_container_width=True)
+        
+        st.markdown("""
+        **Quadrant Interpretation:**
+        
+        - **Upper-right:** Elite (Low Sacks, High Y/A) - Protecting the ball AND throwing downfield
+        - **Upper-left:** High Risk High Reward (High Sacks, High Y/A) - Aggressive downfield but taking sacks
+        - **Lower-right:** Conservative (Low Sacks, Low Y/A) - Safe, short passes with good protection
+        - **Lower-left:** High Risk Low Reward (High Sacks, Low Y/A) - Taking sacks without downfield production
+        
+        **Sack Rate** = Sacks / (Pass Attempts + Sacks)  
+        **Y/A** = Yards per Attempt (downfield aggressiveness and completion efficiency)
+        """)
+    else:
+        st.warning("No data available for selected seasons")
 
 # --- Tab 6: Custom vs ML Composite Comparison ---
 with tabs[5]:
@@ -682,6 +747,203 @@ with tabs[5]:
             st.caption("These QBs excel in volume and clutch/team performance")
     else:
         st.warning("No composite rating data available for selected seasons")
+
+# --- Tab 7: Interactive QB Journey Map ---
+with tabs[6]:
+    st.header("🗺️ Interactive QB Journey Map")
+    st.markdown("""
+    Trace individual QB careers across seasons. Select multiple QBs to compare their rating trajectories,
+    peak performances, and career arcs side-by-side.
+    """)
+    
+    # QB selection with multi-select
+    available_qbs = sorted(df['display_name'].unique())
+    
+    # Suggested notable QBs for quick selection
+    suggested_qbs = [qb for qb in ['Patrick Mahomes', 'Josh Allen', 'Joe Burrow', 'Lamar Jackson', 
+                                     'Jalen Hurts', 'Aaron Rodgers', 'Tom Brady'] if qb in available_qbs]
+    
+    selected_qbs = st.multiselect(
+        "Select QBs to Compare",
+        options=available_qbs,
+        default=suggested_qbs[:3] if len(suggested_qbs) >= 3 else suggested_qbs,
+        help="Select up to 6 QBs for optimal visualization"
+    )
+    
+    if selected_qbs:
+        # Filter data for selected QBs
+        journey_df = df[df['display_name'].isin(selected_qbs)].copy()
+        journey_df = journey_df.sort_values(['display_name', 'season'])
+        
+        # Create interactive line chart
+        fig = go.Figure()
+        
+        colors = px.colors.qualitative.Set2[:len(selected_qbs)]
+        
+        for i, qb in enumerate(selected_qbs):
+            qb_data = journey_df[journey_df['display_name'] == qb]
+            
+            # Main trajectory line
+            fig.add_trace(go.Scatter(
+                x=qb_data['season'],
+                y=qb_data['custom_rating'],
+                mode='lines+markers',
+                name=qb,
+                line=dict(width=3, color=colors[i % len(colors)]),
+                marker=dict(size=10, symbol='circle', line=dict(width=2, color='white')),
+                hovertemplate=(
+                    '<b>%{fullData.name}</b><br>' +
+                    'Season: %{x}<br>' +
+                    'Rating: %{y:.1f}<br>' +
+                    '<extra></extra>'
+                )
+            ))
+            
+            # Add peak marker
+            peak_idx = qb_data['custom_rating'].idxmax()
+            peak_season = qb_data.loc[peak_idx, 'season']
+            peak_rating = qb_data.loc[peak_idx, 'custom_rating']
+            
+            fig.add_trace(go.Scatter(
+                x=[peak_season],
+                y=[peak_rating],
+                mode='markers',
+                marker=dict(size=18, symbol='star', color=colors[i % len(colors)], 
+                           line=dict(width=2, color='gold')),
+                name=f"{qb} Peak",
+                showlegend=False,
+                hovertemplate=(
+                    f'<b>{qb} PEAK</b><br>' +
+                    f'Season: {peak_season}<br>' +
+                    f'Rating: {peak_rating:.1f}<br>' +
+                    '<extra></extra>'
+                )
+            ))
+        
+        # Add league average reference line
+        league_avg = df.groupby('season')['custom_rating'].mean().reset_index()
+        fig.add_trace(go.Scatter(
+            x=league_avg['season'],
+            y=league_avg['custom_rating'],
+            mode='lines',
+            name='League Average',
+            line=dict(width=2, dash='dash', color='gray'),
+            hovertemplate=(
+                '<b>League Average</b><br>' +
+                'Season: %{x}<br>' +
+                'Rating: %{y:.1f}<br>' +
+                '<extra></extra>'
+            )
+        ))
+        
+        fig.update_layout(
+            title="QB Rating Trajectories Over Time",
+            xaxis_title="Season",
+            yaxis_title="Custom Rating",
+            height=600,
+            hovermode='closest',
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="right",
+                x=0.99,
+                bgcolor="rgba(255,255,255,0.8)"
+            ),
+            plot_bgcolor='rgba(240,240,240,0.3)',
+            xaxis=dict(
+                tickmode='linear',
+                tick0=journey_df['season'].min(),
+                dtick=1,
+                gridcolor='lightgray'
+            ),
+            yaxis=dict(
+                gridcolor='lightgray',
+                range=[journey_df['custom_rating'].min() - 3, journey_df['custom_rating'].max() + 3]
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Career statistics comparison
+        st.subheader("Career Statistics Comparison")
+        
+        career_stats = []
+        for qb in selected_qbs:
+            qb_data = journey_df[journey_df['display_name'] == qb]
+            
+            stats = {
+                'QB': qb,
+                'Seasons': len(qb_data),
+                'Peak Rating': qb_data['custom_rating'].max(),
+                'Avg Rating': qb_data['custom_rating'].mean(),
+                'Current (2025)': qb_data[qb_data['season'] == 2025]['custom_rating'].values[0] if 2025 in qb_data['season'].values else 'N/A',
+                'Archetype': qb_data['archetype'].mode()[0] if not qb_data['archetype'].mode().empty else 'N/A',
+                'Total Attempts': qb_data['attempts'].sum()
+            }
+            career_stats.append(stats)
+        
+        career_df = pd.DataFrame(career_stats)
+        
+        # Format the dataframe
+        st.dataframe(career_df.style.format({
+            'Peak Rating': '{:.1f}',
+            'Avg Rating': '{:.1f}',
+            'Current (2025)': lambda x: f'{x:.1f}' if isinstance(x, (int, float)) else x,
+            'Total Attempts': '{:,.0f}'
+        }), use_container_width=True)
+        
+        # Playstyle evolution (for single QB selection)
+        if len(selected_qbs) == 1:
+            st.subheader(f"{selected_qbs[0]} - Playstyle Evolution")
+            
+            qb_journey = journey_df[journey_df['display_name'] == selected_qbs[0]]
+            
+            playstyle_cols = ['playmaking_rating', 'aggression_rating', 'accuracy_rating',
+                            'ball_security_rating', 'pocket_presence_rating', 'mobility_rating']
+            
+            fig_evolution = go.Figure()
+            
+            playstyle_colors = {
+                'playmaking_rating': '#FF6B6B',
+                'aggression_rating': '#4ECDC4',
+                'accuracy_rating': '#45B7D1',
+                'ball_security_rating': '#96CEB4',
+                'pocket_presence_rating': '#FFEAA7',
+                'mobility_rating': '#DDA15E'
+            }
+            
+            for col in playstyle_cols:
+                display_name = col.replace('_rating', '').replace('_', ' ').title()
+                
+                fig_evolution.add_trace(go.Scatter(
+                    x=qb_journey['season'],
+                    y=qb_journey[col],
+                    mode='lines+markers',
+                    name=display_name,
+                    line=dict(width=2.5, color=playstyle_colors[col]),
+                    marker=dict(size=8)
+                ))
+            
+            fig_evolution.update_layout(
+                title=f"{selected_qbs[0]} Playstyle Ratings Evolution",
+                xaxis_title="Season",
+                yaxis_title="Playstyle Rating",
+                height=500,
+                hovermode='x unified',
+                legend=dict(
+                    yanchor="top",
+                    y=0.99,
+                    xanchor="left",
+                    x=0.01,
+                    bgcolor="rgba(255,255,255,0.9)"
+                ),
+                xaxis=dict(tickmode='linear', dtick=1)
+            )
+            
+            st.plotly_chart(fig_evolution, use_container_width=True)
+            
+    else:
+        st.info("Please select at least one QB to view their journey.")
 
 # Footer
 st.markdown("---")
