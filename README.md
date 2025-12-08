@@ -14,8 +14,11 @@ Build a custom QB rating system that improves upon existing models by utilizing 
 - Play-by-play situational data (EPA, CPOE, WPA, etc.)
 - Multi-season performance patterns
 
-### Secondary Goal
+### Secondary Goals
 Predict future QB performance and statistics based on historical trends and multi-season patterns.
+
+Provide contract value analysis for Quarterbacks.
+
 
 ## Key Features
 
