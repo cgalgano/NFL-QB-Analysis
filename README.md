@@ -57,8 +57,22 @@ uv sync
 
 ### Run Streamlit Dashboard
 ```bash
-uv run streamlit run custom_qb_ratings_app.py
+uv run streamlit run applications/custom_qb_ratings_app.py
 ```
+
+### Update Data (Weekly/As Needed)
+```bash
+# Fetch latest nflfastR data and regenerate all ratings
+python update_data.py
+```
+This automated pipeline:
+1. Fetches the latest play-by-play data from nflfastR
+2. Updates the database with new games
+3. Regenerates QB statistics views
+4. Recalculates all custom ratings
+5. Updates the "Last Updated" timestamp in the app
+
+**Note:** nflfastR updates weekly during the NFL season. Run this script to keep your analysis current.
 
 ### Explore Analysis Notebooks
 - `Modeling/custom_qb_rating_system.ipynb` - Rating formula development

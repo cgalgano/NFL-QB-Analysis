@@ -142,6 +142,16 @@ def load_data():
     conn = sqlite3.connect('data_load/nfl_qb_data.db')
     names_df = pd.read_sql('SELECT DISTINCT player_id, player_name as full_name FROM qb_statistics', conn)
     
+    # Get last data refresh timestamp
+    try:
+        metadata_df = pd.read_sql('SELECT value, updated_at FROM metadata WHERE key = "last_data_refresh"', conn)
+        if not metadata_df.empty:
+            last_refresh = metadata_df.iloc[0]['updated_at']
+        else:
+            last_refresh = None
+    except:
+        last_refresh = None
+    
     # Get yards per attempt from qb_season_stats view
     ya_query = """
     SELECT 
@@ -164,9 +174,9 @@ def load_data():
     # Calculate archetypes
     df['archetype'] = df.apply(assign_custom_archetype, axis=1)
     
-    return df
+    return df, last_refresh
 
-df = load_data()
+df, last_refresh = load_data()
 
 # --- Helper: Explanation of Ratings ---
 def rating_explanation():
@@ -203,7 +213,18 @@ def rating_explanation():
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Custom NFL QB Rankings", layout="wide")
-st.title("🏈 Custom NFL QB Rankings (2010-2025)")
+
+# Header with last updated info
+col1, col2 = st.columns([3, 1])
+with col1:
+    st.title("🏈 Custom NFL QB Rankings (2010-2025)")
+with col2:
+    if last_refresh:
+        from datetime import datetime
+        refresh_dt = datetime.fromisoformat(last_refresh)
+        st.caption(f"📅 Last updated: {refresh_dt.strftime('%Y-%m-%d %H:%M')}")
+    else:
+        st.caption("💡 Run `python update_data.py` to refresh")
 
 tabs = st.tabs(["Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map"])
 

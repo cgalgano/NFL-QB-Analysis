@@ -93,7 +93,7 @@ def create_qb_plays_view(db_path='c:/Users/carme/NFL_QB_Project/data_load/nfl_qb
     cursor.execute(create_view_sql)
     conn.commit()
     
-    print("✓ View created successfully!")
+    print("[OK] View created successfully!")
     
     # Test the view
     print("\nTesting view with Lamar Jackson 2024...")
@@ -119,9 +119,9 @@ def create_qb_plays_view(db_path='c:/Users/carme/NFL_QB_Project/data_load/nfl_qb
         print(f"Rush attempts: {result[3]:,}")
         print(f"Completions: {result[4]:,}")
         print(f"Rushing yards: {result[5]:,.0f}")
-        print("\n✓ View is working correctly!")
+        print("\n[OK] View is working correctly!")
     else:
-        print("\n✗ Test query returned no results")
+        print("\n[ERROR] Test query returned no results")
     
     # Show total plays in view
     total_plays = cursor.execute("SELECT COUNT(*) FROM qb_plays").fetchone()[0]

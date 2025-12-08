@@ -105,15 +105,15 @@ def load_pbp_data(start_year, end_year):
             missing_cols = [col for col in QB_RELEVANT_COLUMNS if col not in season_data.columns]
             
             if missing_cols:
-                print(f"\n  ⚠ Missing columns: {missing_cols[:5]}{'...' if len(missing_cols) > 5 else ''}")
+                print(f"\n  [WARNING] Missing columns: {missing_cols[:5]}{'...' if len(missing_cols) > 5 else ''}")
             
             season_data = season_data[available_cols].copy()
             pbp_list.append(season_data)
             
-            print(f"✓ Loaded {len(season_data):,} plays")
+            print(f"[OK] Loaded {len(season_data):,} plays")
             
         except Exception as e:
-            print(f"✗ Error loading {year}: {e}")
+            print(f"[ERROR] Error loading {year}: {e}")
             continue
     
     if not pbp_list:
@@ -147,9 +147,9 @@ def create_indexes(conn):
     for idx_name, columns in indexes:
         try:
             cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {TABLE_NAME} ({columns})")
-            print(f"  ✓ Created index: {idx_name}")
+            print(f"  [OK] Created index: {idx_name}")
         except Exception as e:
-            print(f"  ✗ Error creating {idx_name}: {e}")
+            print(f"  [ERROR] Error creating {idx_name}: {e}")
     
     conn.commit()
     print("Indexes created successfully!\n")
@@ -304,7 +304,7 @@ def main():
         print("="*60 + "\n")
         
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\n[ERROR]: {e}")
         import traceback
         traceback.print_exc()
         return 1

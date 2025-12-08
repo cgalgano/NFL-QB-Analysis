@@ -171,12 +171,12 @@ cursor = conn.cursor()
 
 # Drop existing view if it exists
 cursor.execute("DROP VIEW IF EXISTS qb_season_stats")
-print("✓ Dropped old view (if existed)")
+print("[OK] Dropped old view (if existed)")
 
 # Create new view
 cursor.execute(create_view_sql)
 conn.commit()
-print("✓ Created qb_season_stats view")
+print("[OK] Created qb_season_stats view")
 
 # Test the view
 test_query = """
@@ -199,7 +199,7 @@ print(f"Seasons covered: {result[1]}-{result[2]}")
 print(f"Unique QBs: {result[3]:,}")
 
 print("\n" + "="*80)
-print("✅ View created successfully!")
+print("[OK] View created successfully!")
 print("="*80)
 print("\nNow you can query season-level stats with:")
 print("  SELECT * FROM qb_season_stats")
