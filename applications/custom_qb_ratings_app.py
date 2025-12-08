@@ -241,7 +241,17 @@ with col2:
         refresh_dt = datetime.fromisoformat(last_refresh)
         st.caption(f"📅 Last updated: {refresh_dt.strftime('%Y-%m-%d %H:%M')}")
     else:
-        st.caption("💡 Run `python update_data.py` to refresh")
+        # Fallback: Use CSV file modification time
+        from pathlib import Path
+        import os
+        csv_path = Path('Modeling/models/custom_qb_ratings.csv')
+        if csv_path.exists():
+            from datetime import datetime
+            mtime = os.path.getmtime(csv_path)
+            file_dt = datetime.fromtimestamp(mtime)
+            st.caption(f"📅 Data as of: {file_dt.strftime('%Y-%m-%d')}")
+        else:
+            st.caption("💡 Run `python update_data.py` to refresh")
 
 tabs = st.tabs(["Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map"])
 
