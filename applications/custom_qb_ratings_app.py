@@ -173,12 +173,11 @@ def load_data():
         df = df.merge(names_df, on='player_id', how='left')
         df = df.merge(ya_df, on=['player_id', 'season'], how='left')
     else:
-        # No database - calculate yards per attempt from available data
-        # Assuming pass_yards_per_game is in df, otherwise use defaults
-        if 'pass_yards_per_game' in df.columns:
+        # No database - calculate yards per attempt from CSV data
+        if 'pass_yards_per_game' in df.columns and 'attempts' in df.columns:
             df['yards_per_attempt'] = (df['pass_yards_per_game'] * 17.0) / df['attempts']
         else:
-            df['yards_per_attempt'] = 7.0  # Default reasonable value
+            df['yards_per_attempt'] = 7.0  # Fallback
         
         df['full_name'] = None  # Will use player_name as fallback
     
