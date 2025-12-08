@@ -5,6 +5,32 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
 import io
+from pathlib import Path
+import sys
+
+# Check if data exists, if not run initialization
+def check_data_initialized():
+    """Check if required data files exist."""
+    db_path = Path('data_load/nfl_qb_data.db')
+    ratings_path = Path('Modeling/models/custom_qb_ratings.csv')
+    return db_path.exists() and ratings_path.exists()
+
+# Run initialization if needed (only on Streamlit Cloud)
+if not check_data_initialized():
+    st.info("🏈 First-time setup: Initializing NFL QB data...")
+    st.info("This will take 5-10 minutes. Please wait...")
+    
+    with st.spinner("Fetching data from nflfastR and generating ratings..."):
+        import subprocess
+        result = subprocess.run([sys.executable, 'init_cloud_data.py'], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            st.error("Failed to initialize data. Please check logs.")
+            st.code(result.stderr)
+            st.stop()
+        else:
+            st.success("Data initialization complete! Starting app...")
+            st.rerun()
 
 # --- Archetype Assignment Logic ---
 def get_level(val):
@@ -176,8 +202,6 @@ def load_data():
     
     return df, last_refresh
 
-df, last_refresh = load_data()
-
 # --- Helper: Explanation of Ratings ---
 def rating_explanation():
     st.markdown("""
@@ -213,6 +237,9 @@ def rating_explanation():
 
 # --- Streamlit App ---
 st.set_page_config(page_title="Custom NFL QB Rankings", layout="wide")
+
+# Load data after initialization check completes
+df, last_refresh = load_data()
 
 # Header with last updated info
 col1, col2 = st.columns([3, 1])

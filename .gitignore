@@ -33,9 +33,15 @@ wheels/
 
 # Data cache (nflreadpy downloads)
 *.parquet
-*.csv
-*.pkl
 .cache/
+
+# Generated models (too large for git, but keep directory structure)
+!Modeling/models/.gitkeep
+
+# CSV files (except essential model outputs)
+*.csv
+!Modeling/models/custom_qb_ratings.csv
+!Modeling/models/qb_composite_ratings.csv
 
 # IDE
 .vscode/
