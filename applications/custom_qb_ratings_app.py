@@ -141,34 +141,48 @@ def load_data():
     composite_df = pd.read_csv('Modeling/models/qb_composite_ratings.csv')
     composite_df = composite_df[['player_id', 'season', 'composite_rating', 'predicted_qbr', 'predicted_elo']]
     
-    # Load full names and yards per attempt from database
-    conn = sqlite3.connect('data_load/nfl_qb_data.db')
-    names_df = pd.read_sql('SELECT DISTINCT player_id, player_name as full_name FROM qb_statistics', conn)
+    # Check if database exists (for local dev and full setup)
+    db_path = Path('data_load/nfl_qb_data.db')
+    last_refresh = None
     
-    # Get last data refresh timestamp
-    try:
-        metadata_df = pd.read_sql('SELECT value, updated_at FROM metadata WHERE key = "last_data_refresh"', conn)
-        if not metadata_df.empty:
-            last_refresh = metadata_df.iloc[0]['updated_at']
+    if db_path.exists():
+        # Load additional data from database
+        conn = sqlite3.connect('data_load/nfl_qb_data.db')
+        names_df = pd.read_sql('SELECT DISTINCT player_id, player_name as full_name FROM qb_statistics', conn)
+        
+        # Get last data refresh timestamp
+        try:
+            metadata_df = pd.read_sql('SELECT value, updated_at FROM metadata WHERE key = "last_data_refresh"', conn)
+            if not metadata_df.empty:
+                last_refresh = metadata_df.iloc[0]['updated_at']
+        except:
+            pass
+        
+        # Get yards per attempt from qb_season_stats view
+        ya_query = """
+        SELECT 
+            player_id,
+            season,
+            (pass_yards_per_game * 17.0) / attempts as yards_per_attempt
+        FROM qb_season_stats
+        """
+        ya_df = pd.read_sql(ya_query, conn)
+        conn.close()
+        
+        # Merge database data
+        df = df.merge(names_df, on='player_id', how='left')
+        df = df.merge(ya_df, on=['player_id', 'season'], how='left')
+    else:
+        # No database - calculate yards per attempt from available data
+        # Assuming pass_yards_per_game is in df, otherwise use defaults
+        if 'pass_yards_per_game' in df.columns:
+            df['yards_per_attempt'] = (df['pass_yards_per_game'] * 17.0) / df['attempts']
         else:
-            last_refresh = None
-    except:
-        last_refresh = None
+            df['yards_per_attempt'] = 7.0  # Default reasonable value
+        
+        df['full_name'] = None  # Will use player_name as fallback
     
-    # Get yards per attempt from qb_season_stats view
-    ya_query = """
-    SELECT 
-        player_id,
-        season,
-        (pass_yards_per_game * 17.0) / attempts as yards_per_attempt
-    FROM qb_season_stats
-    """
-    ya_df = pd.read_sql(ya_query, conn)
-    conn.close()
-    
-    # Merge everything
-    df = df.merge(names_df, on='player_id', how='left')
-    df = df.merge(ya_df, on=['player_id', 'season'], how='left')
+    # Merge composite ratings
     df = df.merge(composite_df, on=['player_id', 'season'], how='left')
     
     # Use full name if available, otherwise keep abbreviated name
@@ -215,30 +229,7 @@ def rating_explanation():
 # --- Streamlit App ---
 st.set_page_config(page_title="Custom NFL QB Rankings", layout="wide")
 
-# Check if data needs initialization
-def check_data_initialized():
-    """Check if required data files exist."""
-    db_path = Path('data_load/nfl_qb_data.db')
-    ratings_path = Path('Modeling/models/custom_qb_ratings.csv')
-    return db_path.exists() and ratings_path.exists()
-
-# Run initialization if needed
-if not check_data_initialized():
-    st.info("🏈 First-time setup: Initializing NFL QB data...")
-    st.info("⏱️ This will take 5-10 minutes. Please wait...")
-    
-    with st.spinner("Fetching data from nflfastR and generating ratings..."):
-        result = subprocess.run([sys.executable, 'init_cloud_data.py'], capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            st.error("❌ Failed to initialize data. Please check logs.")
-            st.code(result.stderr)
-            st.stop()
-        else:
-            st.success("✅ Data initialization complete! Reloading app...")
-            st.rerun()
-
-# Load data after initialization check completes
+# Load data
 df, last_refresh = load_data()
 
 # Header with last updated info
