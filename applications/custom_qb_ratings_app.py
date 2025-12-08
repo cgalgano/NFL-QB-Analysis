@@ -579,54 +579,53 @@ with tabs[4]:
         min_attempts = 225 * len(selected_years)
         agg_df = agg_df[agg_df['attempts'] >= min_attempts]
         
-        # Invert sack rate for plotting (so lower sack rate is to the right)
-        agg_df['inv_sack_rate'] = -agg_df['sack_rate']
     else:
         agg_df = pd.DataFrame()
     
     if not agg_df.empty:
+        # Use sack rate directly (no inversion) - lower values naturally to the left
         fig2 = px.scatter(
             agg_df,
-            x='inv_sack_rate',
+            x='sack_rate',
             y='yards_per_attempt',
             text='display_name',
             color='custom_rating',
             color_continuous_scale='RdYlGn',
             range_color=[50, 100],
             labels={
-                'inv_sack_rate': 'Sack Rate (Inverted - Lower is Right)',
+                'sack_rate': 'Sack Rate %',
                 'yards_per_attempt': 'Yards per Attempt',
                 'custom_rating': 'Custom Rating'
             },
-            hover_data=['custom_rating', 'sack_rate', 'display_name', 'attempts']
+            hover_data=['custom_rating', 'sack_rate', 'yards_per_attempt', 'attempts']
         )
         fig2.update_traces(textposition='top center', marker=dict(size=14, line=dict(width=1, color='DarkSlateGrey')))
         
-        # Add quadrant lines
-        median_inv_sack = agg_df['inv_sack_rate'].median()
+        # Add quadrant lines at median
+        median_sack = agg_df['sack_rate'].median()
         median_ya = agg_df['yards_per_attempt'].median()
-        fig2.add_shape(type="line", x0=median_inv_sack, x1=median_inv_sack, 
+        fig2.add_shape(type="line", x0=median_sack, x1=median_sack, 
                        y0=agg_df['yards_per_attempt'].min(), y1=agg_df['yards_per_attempt'].max(),
                        line=dict(color="gray", dash="dash"))
-        fig2.add_shape(type="line", x0=agg_df['inv_sack_rate'].min(), x1=agg_df['inv_sack_rate'].max(), 
+        fig2.add_shape(type="line", x0=agg_df['sack_rate'].min(), x1=agg_df['sack_rate'].max(), 
                        y0=median_ya, y1=median_ya,
                        line=dict(color="gray", dash="dash"))
         
-        # Add quadrant labels
-        fig2.add_annotation(x=agg_df['inv_sack_rate'].max(), y=agg_df['yards_per_attempt'].max(),
-            text="Elite<br>(Low Sacks, High Y/A)", showarrow=False, xanchor="right", yanchor="top",
+        # Add quadrant labels (corrected: low sack rate is left, high is right)
+        fig2.add_annotation(x=agg_df['sack_rate'].min(), y=agg_df['yards_per_attempt'].max(),
+            text="Elite<br>(Low Sacks, High Y/A)", showarrow=False, xanchor="left", yanchor="top",
             font=dict(size=13, color="green"), bgcolor="rgba(0,255,0,0.08)")
-        fig2.add_annotation(x=agg_df['inv_sack_rate'].min(), y=agg_df['yards_per_attempt'].max(),
-            text="High Risk High Reward<br>(High Sacks, High Y/A)", showarrow=False, xanchor="left", yanchor="top",
+        fig2.add_annotation(x=agg_df['sack_rate'].max(), y=agg_df['yards_per_attempt'].max(),
+            text="High Risk High Reward<br>(High Sacks, High Y/A)", showarrow=False, xanchor="right", yanchor="top",
             font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
-        fig2.add_annotation(x=agg_df['inv_sack_rate'].max(), y=agg_df['yards_per_attempt'].min(),
-            text="Conservative<br>(Low Sacks, Low Y/A)", showarrow=False, xanchor="right", yanchor="bottom",
+        fig2.add_annotation(x=agg_df['sack_rate'].min(), y=agg_df['yards_per_attempt'].min(),
+            text="Conservative<br>(Low Sacks, Low Y/A)", showarrow=False, xanchor="left", yanchor="bottom",
             font=dict(size=13, color="orange"), bgcolor="rgba(255,255,0,0.08)")
-        fig2.add_annotation(x=agg_df['inv_sack_rate'].min(), y=agg_df['yards_per_attempt'].min(),
-            text="High Risk Low Reward<br>(High Sacks, Low Y/A)", showarrow=False, xanchor="left", yanchor="bottom",
+        fig2.add_annotation(x=agg_df['sack_rate'].max(), y=agg_df['yards_per_attempt'].min(),
+            text="High Risk Low Reward<br>(High Sacks, Low Y/A)", showarrow=False, xanchor="right", yanchor="bottom",
             font=dict(size=13, color="red"), bgcolor="rgba(255,0,0,0.08)")
         
-        fig2.update_layout(height=700, xaxis_title="Sack Rate (Inverted: Lower Sack Rate = Right)", 
+        fig2.update_layout(height=700, xaxis_title="Sack Rate % (Lower = Better)", 
                            yaxis_title="Yards per Attempt")
         st.plotly_chart(fig2, use_container_width=True)
         
