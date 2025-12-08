@@ -8,3 +8,4 @@
 ## Code Practices
 - Do not put unnecessary print statements.
 - Do not make everything look so bloated and AI generated. no emojis.
+- try to avoid running stuff in terminal excessively or at all.
