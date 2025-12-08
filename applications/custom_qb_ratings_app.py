@@ -216,10 +216,10 @@ def rating_explanation():
     
     #### Custom Rating Formula Weights:
     - **Efficiency (40%)**: Total Pass EPA (50%) + Success Rate (30%) + CPOE (20%)
-    - **Impact (20%)**: Total WPA (50%) + High Leverage EPA (30%) + TD Rate (20%)
+    - **Impact (17.5%)**: Total WPA (50%) + High Leverage EPA (30%) + TD Rate (20%)
     - **Consistency (20%)**: 3rd Down Success (40%) + Red Zone EPA (35%) + Completion % (25%)
-    - **Volume (5%)**: Passing Yards (40%) + Rush Yds/Game (30%) + Total TDs (30%)
-    - **Ball Security (10%)**: Turnover Rate inverted (60%) + Sack Rate inverted (40%)
+    - **Volume (7.5%)**: Passing Yards (40%) + Rush Yds/Game (30%) + Total TDs (30%)
+    - **Ball Security (10%)**: Turnover Rate inverted (40%) + Sack Rate inverted (60%)
     - **Pressure Performance (5%)**: EPA Under Pressure (100%)
     
     **Data Source**: Play-by-play data (2010-2025) aggregated to season level. Minimum 150 attempts per season.
