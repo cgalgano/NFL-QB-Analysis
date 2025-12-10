@@ -2,7 +2,7 @@
 
 Custom quarterback rating system built from 754,858 play-by-play records, analyzing 16 seasons of NFL data to create a more comprehensive QB evaluation model.
 
-**🚀 Live App:** https://nfl-qb-analysis-carmengalgano.streamlit.app/
+**Live App:** https://nfl-qb-analysis-carmengalgano.streamlit.app/
 
 ## Project Overview
 
