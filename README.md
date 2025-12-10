@@ -2,6 +2,8 @@
 
 Custom quarterback rating system built from 754,858 play-by-play records, analyzing 16 seasons of NFL data to create a more comprehensive QB evaluation model.
 
+**🚀 Live App:** https://nfl-qb-analysis-carmengalgano.streamlit.app/
+
 ## Project Overview
 
 I am a huge football/NFL fan and Quarterback rankings are always a constant topic of debate among fans. Existing QB rating systems (NFL Passer Rating, QBR, ELO) each capture important aspects of quarterback play, but none provide a complete picture. So, I created this project that develops a custom rating system by analyzing these established models alongside raw play-by-play data to better evaluate modern quarterback performance.
