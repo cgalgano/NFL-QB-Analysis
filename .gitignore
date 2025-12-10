@@ -60,3 +60,6 @@ chromedriver-win64/
 
 # Database
 *.db
+
+# GitHub Copilot (keep instructions private)
+.github/copilot-instructions.md
