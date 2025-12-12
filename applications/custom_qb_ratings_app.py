@@ -132,13 +132,13 @@ def load_data():
     import sqlite3
     
     # Load custom ratings
-    df = pd.read_csv('Modeling/models/custom_qb_ratings.csv')
+    df = pd.read_csv('modeling/models/custom_qb_ratings.csv')
     
     # Remove duplicates - keep the entry with more attempts for each player_id + season combination
     df = df.sort_values('attempts', ascending=False).drop_duplicates(subset=['player_id', 'season'], keep='first')
     
     # Load composite ratings from ML model
-    composite_df = pd.read_csv('Modeling/models/qb_composite_ratings.csv')
+    composite_df = pd.read_csv('modeling/models/qb_composite_ratings.csv')
     composite_df = composite_df[['player_id', 'season', 'composite_rating', 'predicted_qbr', 'predicted_elo']]
     
     # Check if database exists (for local dev and full setup)
@@ -244,7 +244,7 @@ with col2:
         # Fallback: Use CSV file modification time
         from pathlib import Path
         import os
-        csv_path = Path('Modeling/models/custom_qb_ratings.csv')
+        csv_path = Path('modeling/models/custom_qb_ratings.csv')
         if csv_path.exists():
             from datetime import datetime
             mtime = os.path.getmtime(csv_path)

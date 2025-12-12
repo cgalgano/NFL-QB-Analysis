@@ -100,8 +100,8 @@ def main():
     try:
         import papermill as pm
         pm.execute_notebook(
-            'Modeling/custom_qb_rating_system.ipynb',
-            'Modeling/custom_qb_rating_system.ipynb',
+            'modeling/custom_qb_rating_system.ipynb',
+            'modeling/custom_qb_rating_system.ipynb',
             kernel_name='python3'
         )
         log("[OK] Completed: QB ratings regenerated")
@@ -109,11 +109,11 @@ def main():
         log("[ERROR] Failed: papermill not available")
         log("Please run: uv add papermill")
         log("Then re-run this script, or manually execute:")
-        log("  Modeling/custom_qb_rating_system.ipynb")
+        log("  modeling/custom_qb_rating_system.ipynb")
         return 1
     except Exception as e:
         log(f"[ERROR] Failed: {e}")
-        log("Please manually run the notebook: Modeling/custom_qb_rating_system.ipynb")
+        log("Please manually run the notebook: modeling/custom_qb_rating_system.ipynb")
         return 1
     
     # Step 4: Update timestamp
