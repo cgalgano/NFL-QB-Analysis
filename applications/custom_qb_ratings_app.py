@@ -129,68 +129,47 @@ def assign_custom_archetype(row):
 # --- Load Data ---
 @st.cache_data
 def load_data():
-    import sqlite3
-    
-    # Load custom ratings
-    df = pd.read_csv('modeling/models/custom_qb_ratings.csv')
-    
-    # Remove duplicates - keep the entry with more attempts for each player_id + season combination
-    df = df.sort_values('attempts', ascending=False).drop_duplicates(subset=['player_id', 'season'], keep='first')
-    
-    # Load composite ratings from ML model
-    composite_df = pd.read_csv('modeling/models/qb_composite_ratings.csv')
-    composite_df = composite_df[['player_id', 'season', 'composite_rating', 'predicted_qbr', 'predicted_elo']]
-    
-    # Check if database exists (for local dev and full setup)
-    db_path = Path('data_load/nfl_qb_data.db')
-    last_refresh = None
-    
-    if db_path.exists():
-        # Load additional data from database
-        conn = sqlite3.connect('data_load/nfl_qb_data.db')
-        names_df = pd.read_sql('SELECT DISTINCT player_id, player_name as full_name FROM qb_statistics', conn)
+    """Load QB ratings data from CSV files (optimized for cloud deployment)."""
+    try:
+        # Load custom ratings
+        df = pd.read_csv('modeling/models/custom_qb_ratings.csv')
         
-        # Get last data refresh timestamp
-        try:
-            metadata_df = pd.read_sql('SELECT value, updated_at FROM metadata WHERE key = "last_data_refresh"', conn)
-            if not metadata_df.empty:
-                last_refresh = metadata_df.iloc[0]['updated_at']
-        except:
-            pass
+        # Remove duplicates - keep the entry with more attempts for each player_id + season combination
+        df = df.sort_values('attempts', ascending=False).drop_duplicates(subset=['player_id', 'season'], keep='first')
         
-        # Get yards per attempt from qb_season_stats view
-        ya_query = """
-        SELECT 
-            player_id,
-            season,
-            (pass_yards_per_game * 17.0) / attempts as yards_per_attempt
-        FROM qb_season_stats
-        """
-        ya_df = pd.read_sql(ya_query, conn)
-        conn.close()
+        # Load composite ratings from ML model
+        composite_df = pd.read_csv('modeling/models/qb_composite_ratings.csv')
+        composite_df = composite_df[['player_id', 'season', 'composite_rating', 'predicted_qbr', 'predicted_elo']]
         
-        # Merge database data
-        df = df.merge(names_df, on='player_id', how='left')
-        df = df.merge(ya_df, on=['player_id', 'season'], how='left')
-    else:
-        # No database - calculate yards per attempt from CSV data
+        # Merge composite ratings
+        df = df.merge(composite_df, on=['player_id', 'season'], how='left')
+        
+        # Calculate yards per attempt from CSV data (no database needed for cloud deployment)
         if 'pass_yards_per_game' in df.columns and 'attempts' in df.columns:
             df['yards_per_attempt'] = (df['pass_yards_per_game'] * 17.0) / df['attempts']
         else:
             df['yards_per_attempt'] = 7.0  # Fallback
         
-        df['full_name'] = None  # Will use player_name as fallback
-    
-    # Merge composite ratings
-    df = df.merge(composite_df, on=['player_id', 'season'], how='left')
-    
-    # Use full name if available, otherwise keep abbreviated name
-    df['display_name'] = df['full_name'].fillna(df['player_name'])
-    
-    # Calculate archetypes
-    df['archetype'] = df.apply(assign_custom_archetype, axis=1)
-    
-    return df, last_refresh
+        # Use player_name from CSV as display name
+        df['display_name'] = df['player_name']
+        
+        # Calculate archetypes
+        df['archetype'] = df.apply(assign_custom_archetype, axis=1)
+        
+        # For last refresh, use CSV file modification time
+        last_refresh = None
+        csv_path = Path('modeling/models/custom_qb_ratings.csv')
+        if csv_path.exists():
+            import os
+            from datetime import datetime
+            mtime = os.path.getmtime(csv_path)
+            last_refresh = datetime.fromtimestamp(mtime).isoformat()
+        
+        return df, last_refresh
+        
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        raise
 
 # --- Helper: Explanation of Ratings ---
 def rating_explanation():
@@ -239,19 +218,7 @@ with col2:
     if last_refresh:
         from datetime import datetime
         refresh_dt = datetime.fromisoformat(last_refresh)
-        st.caption(f"📅 Last updated: {refresh_dt.strftime('%Y-%m-%d %H:%M')}")
-    else:
-        # Fallback: Use CSV file modification time
-        from pathlib import Path
-        import os
-        csv_path = Path('modeling/models/custom_qb_ratings.csv')
-        if csv_path.exists():
-            from datetime import datetime
-            mtime = os.path.getmtime(csv_path)
-            file_dt = datetime.fromtimestamp(mtime)
-            st.caption(f"📅 Data as of: {file_dt.strftime('%Y-%m-%d')}")
-        else:
-            st.caption("💡 Run `python update_data.py` to refresh")
+        st.caption(f"📅 Data as of: {refresh_dt.strftime('%Y-%m-%d')}")
 
 tabs = st.tabs(["Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map"])
 
