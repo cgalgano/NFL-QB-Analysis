@@ -35,13 +35,11 @@ wheels/
 *.parquet
 .cache/
 
-# Generated models (too large for git, but keep directory structure)
-!Modeling/models/.gitkeep
+# CSV files - ignore in specific directories only
+initial_stuff/*.csv
+data_load/**/*.csv
 
-# CSV files (except essential model outputs)
-*.csv
-!Modeling/models/custom_qb_ratings.csv
-!Modeling/models/qb_composite_ratings.csv
+# Keep modeling/models files tracked
 
 # IDE
 .vscode/
