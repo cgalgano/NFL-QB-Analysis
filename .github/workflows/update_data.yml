@@ -2,8 +2,8 @@ name: Update NFL QB Data
 
 on:
   schedule:
-    # Run every Monday at 9 AM UTC (during NFL season)
-    - cron: '0 9 * * 1'
+    # Run every Tuesday at 10 AM UTC (after Monday Night Football)
+    - cron: '0 10 * * 2'
   workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 jobs:
@@ -20,37 +20,22 @@ jobs:
         python-version: '3.12'
         
     - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      uses: astral-sh/setup-uv@v4
         
     - name: Install dependencies
       run: |
-        uv venv
-        uv pip install -r requirements.txt
-        uv pip install papermill nbconvert
+        uv pip install --system -r requirements.txt
+        uv pip install --system papermill
         
-    - name: Fetch latest NFL data
-      run: |
-        source .venv/bin/activate
-        python data_load/load_pbp_to_db.py
-        
-    - name: Update QB stats views
-      run: |
-        source .venv/bin/activate
-        python data_load/create_qb_season_stats_view.py
-        
-    - name: Regenerate QB ratings
-      run: |
-        source .venv/bin/activate
-        papermill Modeling/custom_qb_rating_system.ipynb Modeling/custom_qb_rating_system.ipynb
+    - name: Run data update pipeline
+      run: python update_data.py
         
     - name: Commit and push changes
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add Modeling/models/*.csv
-        git diff --staged --quiet || git commit -m "Automated data update - $(date +'%Y-%m-%d')"
+        git add modeling/models/*.csv
+        git diff --staged --quiet || git commit -m "Auto-update QB data - $(date +'%Y-%m-%d') [skip ci]"
         git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
