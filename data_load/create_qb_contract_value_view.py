@@ -37,7 +37,7 @@ contract_years AS (
       AND n.year_offset < pc.years  -- Only include years within contract length
 ),
 
--- Get QB season stats (using the view if it exists, otherwise aggregate from qb_plays)
+-- Get QB season stats with all necessary components
 qb_season_performance AS (
     SELECT 
         player_name,
@@ -53,16 +53,20 @@ qb_season_performance AS (
         total_rush_epa,
         rush_success_rate,
         total_wpa,
+        high_leverage_epa,
+        third_down_success,
         red_zone_epa,
-        late_close_epa,
-        pressure_rate,
+        pass_yards_per_game,
+        rush_yards_per_game,
+        total_tds_per_game,
+        sack_rate,
         epa_under_pressure
     FROM qb_season_stats
     WHERE attempts >= 100  -- Filter to meaningful sample sizes
 ),
 
--- Calculate custom rating from components
-qb_ratings AS (
+-- Normalize all features (50-100 scale, within each season)
+qb_normalized AS (
     SELECT 
         player_id,
         player_name,
@@ -74,41 +78,115 @@ qb_ratings AS (
         completion_pct,
         td_rate,
         turnover_rate,
-        total_rush_epa,
         total_wpa,
         
-        -- Normalize EPA (most important factor)
+        -- Efficiency components
         50 + 50 * (
             (total_pass_epa - MIN(total_pass_epa) OVER (PARTITION BY season)) / 
             NULLIF(MAX(total_pass_epa) OVER (PARTITION BY season) - MIN(total_pass_epa) OVER (PARTITION BY season), 0)
-        ) AS epa_norm,
+        ) AS total_pass_epa_norm,
         
-        -- Normalize success rate
         50 + 50 * (
             (pass_success_rate - MIN(pass_success_rate) OVER (PARTITION BY season)) / 
             NULLIF(MAX(pass_success_rate) OVER (PARTITION BY season) - MIN(pass_success_rate) OVER (PARTITION BY season), 0)
-        ) AS success_norm,
+        ) AS pass_success_rate_norm,
         
-        -- Normalize CPOE
         50 + 50 * (
             (cpoe - MIN(cpoe) OVER (PARTITION BY season)) / 
             NULLIF(MAX(cpoe) OVER (PARTITION BY season) - MIN(cpoe) OVER (PARTITION BY season), 0)
-        ) AS cpoe_norm
+        ) AS cpoe_norm,
+        
+        -- Impact components
+        50 + 50 * (
+            (total_wpa - MIN(total_wpa) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(total_wpa) OVER (PARTITION BY season) - MIN(total_wpa) OVER (PARTITION BY season), 0)
+        ) AS total_wpa_norm,
+        
+        50 + 50 * (
+            (high_leverage_epa - MIN(high_leverage_epa) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(high_leverage_epa) OVER (PARTITION BY season) - MIN(high_leverage_epa) OVER (PARTITION BY season), 0)
+        ) AS high_leverage_epa_norm,
+        
+        50 + 50 * (
+            (td_rate - MIN(td_rate) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(td_rate) OVER (PARTITION BY season) - MIN(td_rate) OVER (PARTITION BY season), 0)
+        ) AS td_rate_norm,
+        
+        -- Consistency components
+        50 + 50 * (
+            (third_down_success - MIN(third_down_success) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(third_down_success) OVER (PARTITION BY season) - MIN(third_down_success) OVER (PARTITION BY season), 0)
+        ) AS third_down_success_norm,
+        
+        50 + 50 * (
+            (red_zone_epa - MIN(red_zone_epa) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(red_zone_epa) OVER (PARTITION BY season) - MIN(red_zone_epa) OVER (PARTITION BY season), 0)
+        ) AS red_zone_epa_norm,
+        
+        50 + 50 * (
+            (completion_pct - MIN(completion_pct) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(completion_pct) OVER (PARTITION BY season) - MIN(completion_pct) OVER (PARTITION BY season), 0)
+        ) AS completion_pct_norm,
+        
+        -- Volume components
+        50 + 50 * (
+            (pass_yards_per_game - MIN(pass_yards_per_game) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(pass_yards_per_game) OVER (PARTITION BY season) - MIN(pass_yards_per_game) OVER (PARTITION BY season), 0)
+        ) AS pass_yards_per_game_norm,
+        
+        50 + 50 * (
+            (rush_yards_per_game - MIN(rush_yards_per_game) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(rush_yards_per_game) OVER (PARTITION BY season) - MIN(rush_yards_per_game) OVER (PARTITION BY season), 0)
+        ) AS rush_yards_per_game_norm,
+        
+        50 + 50 * (
+            (total_tds_per_game - MIN(total_tds_per_game) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(total_tds_per_game) OVER (PARTITION BY season) - MIN(total_tds_per_game) OVER (PARTITION BY season), 0)
+        ) AS total_tds_per_game_norm,
+        
+        -- Ball security components (inverted - lower is better)
+        50 + 50 * (
+            (MAX(turnover_rate) OVER (PARTITION BY season) - turnover_rate) / 
+            NULLIF(MAX(turnover_rate) OVER (PARTITION BY season) - MIN(turnover_rate) OVER (PARTITION BY season), 0)
+        ) AS turnover_rate_norm,
+        
+        50 + 50 * (
+            (MAX(sack_rate) OVER (PARTITION BY season) - sack_rate) / 
+            NULLIF(MAX(sack_rate) OVER (PARTITION BY season) - MIN(sack_rate) OVER (PARTITION BY season), 0)
+        ) AS sack_rate_norm,
+        
+        -- Pressure performance
+        50 + 50 * (
+            (epa_under_pressure - MIN(epa_under_pressure) OVER (PARTITION BY season)) / 
+            NULLIF(MAX(epa_under_pressure) OVER (PARTITION BY season) - MIN(epa_under_pressure) OVER (PARTITION BY season), 0)
+        ) AS epa_under_pressure_norm
         
     FROM qb_season_performance
 ),
 
+-- Calculate composite rating using exact formula from custom_qb_rating_system.ipynb
 qb_composite_ratings AS (
     SELECT 
         *,
-        -- Custom composite rating (50-100 scale)
+        -- Component scores
+        (0.50 * total_pass_epa_norm + 0.30 * pass_success_rate_norm + 0.20 * cpoe_norm) AS efficiency_score,
+        (0.50 * total_wpa_norm + 0.30 * high_leverage_epa_norm + 0.20 * td_rate_norm) AS impact_score,
+        (0.40 * third_down_success_norm + 0.35 * red_zone_epa_norm + 0.25 * completion_pct_norm) AS consistency_score,
+        (0.40 * pass_yards_per_game_norm + 0.40 * rush_yards_per_game_norm + 0.20 * total_tds_per_game_norm) AS volume_score,
+        (0.40 * turnover_rate_norm + 0.60 * sack_rate_norm) AS ball_security_score,
+        epa_under_pressure_norm AS pressure_score,
+        
+        -- Custom rating (matches custom_qb_rating_system.ipynb formula exactly)
         ROUND(
-            0.50 * COALESCE(epa_norm, 75) +
-            0.30 * COALESCE(success_norm, 75) +
-            0.20 * COALESCE(cpoe_norm, 75),
+            0.40 * (0.50 * total_pass_epa_norm + 0.30 * pass_success_rate_norm + 0.20 * cpoe_norm) +
+            0.175 * (0.50 * total_wpa_norm + 0.30 * high_leverage_epa_norm + 0.20 * td_rate_norm) +
+            0.20 * (0.40 * third_down_success_norm + 0.35 * red_zone_epa_norm + 0.25 * completion_pct_norm) +
+            0.075 * (0.40 * pass_yards_per_game_norm + 0.40 * rush_yards_per_game_norm + 0.20 * total_tds_per_game_norm) +
+            0.10 * (0.40 * turnover_rate_norm + 0.60 * sack_rate_norm) +
+            0.05 * epa_under_pressure_norm,
             1
         ) AS custom_rating
-    FROM qb_ratings
+    FROM qb_normalized
 ),
 
 -- Merge contracts with performance
