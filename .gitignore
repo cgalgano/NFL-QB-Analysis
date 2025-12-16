@@ -61,3 +61,6 @@ chromedriver-win64/
 
 # GitHub Copilot (keep instructions private)
 .github/copilot-instructions.md
+
+# pkl
+*.pkl
