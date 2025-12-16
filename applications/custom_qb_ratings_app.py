@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 import matplotlib.pyplot as plt
 import seaborn as sns
-import sqlite3
 import io
 from pathlib import Path
 import sys
@@ -971,10 +970,8 @@ with tabs[7]:
     """)
     
     try:
-        # Load contract value data from database view
-        conn = sqlite3.connect('data_load/nfl_qb_data.db')
-        contract_df = pd.read_sql_query("SELECT * FROM qb_contract_value", conn)
-        conn.close()
+        # Load contract value data from CSV (optimized for cloud deployment)
+        contract_df = pd.read_csv('modeling/models/qb_contract_value.csv')
         
         # Year filter
         all_contract_years = sorted(contract_df['season'].unique(), reverse=True)
@@ -1143,7 +1140,7 @@ with tabs[7]:
     
     except Exception as e:
         st.error(f"Error loading contract value data: {e}")
-        st.info("Make sure the qb_contract_value view has been created. Run `python data_load/create_qb_contract_value_view.py` to create it.")
+        st.info("Make sure qb_contract_value.csv exists in modeling/models/ directory.")
 
 # Footer
 st.markdown("---")

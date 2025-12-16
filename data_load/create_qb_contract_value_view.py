@@ -4,6 +4,7 @@ Combines QB season stats with contract data to analyze value vs performance.
 """
 
 import sqlite3
+import pandas as pd
 
 db_path = 'c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db'
 
@@ -282,4 +283,19 @@ print("\nFiltered examples:")
 print("  SELECT * FROM qb_contract_value WHERE season = 2024")
 print("  SELECT * FROM qb_contract_value WHERE value_category = 'Excellent Value'")
 print("  SELECT * FROM qb_contract_value WHERE value_score > 15 ORDER BY season")
+print("="*80)
+
+# Export to CSV for Streamlit Cloud deployment
+print("\n" + "="*80)
+print("Exporting to CSV for Streamlit deployment...")
+print("="*80)
+
+conn = sqlite3.connect(db_path)
+export_df = pd.read_sql_query("SELECT * FROM qb_contract_value", conn)
+conn.close()
+
+csv_output_path = '../modeling/models/qb_contract_value.csv'
+export_df.to_csv(csv_output_path, index=False)
+
+print(f"[OK] Exported {len(export_df)} records to {csv_output_path}")
 print("="*80)
