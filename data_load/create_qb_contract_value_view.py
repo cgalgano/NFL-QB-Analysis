@@ -7,6 +7,22 @@ import sqlite3
 import pandas as pd
 
 db_path = 'c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db'
+ratings_csv_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/custom_qb_ratings.csv'
+
+print("="*80)
+print("Loading custom ratings from CSV...")
+print("="*80)
+
+# Load ratings CSV
+ratings_df = pd.read_csv(ratings_csv_path)
+print(f"Loaded {len(ratings_df)} ratings records")
+
+# Connect to database
+conn = sqlite3.connect(db_path)
+
+# Create temporary table with ratings
+ratings_df.to_sql('temp_qb_ratings', conn, if_exists='replace', index=False)
+print("[OK] Imported ratings to temp table")
 
 # SQL to create contract value view
 create_view_sql = """
@@ -37,11 +53,11 @@ contract_years AS (
       AND n.year_offset < pc.years  -- Only include years within contract length
 ),
 
--- Get QB season stats with all necessary components
-qb_season_performance AS (
-    SELECT 
-        player_name,
+-- Get stats from qb_season_stats view
+qb_stats AS (
+    SELECT
         player_id,
+        player_name,
         season,
         attempts,
         total_pass_epa,
@@ -50,153 +66,28 @@ qb_season_performance AS (
         completion_pct,
         td_rate,
         turnover_rate,
-        total_rush_epa,
-        rush_success_rate,
-        total_wpa,
-        high_leverage_epa,
-        third_down_success,
-        red_zone_epa,
-        pass_yards_per_game,
-        rush_yards_per_game,
-        total_tds_per_game,
-        sack_rate,
-        epa_under_pressure
+        total_wpa
     FROM qb_season_stats
-    WHERE attempts >= 100  -- Filter to meaningful sample sizes
+    WHERE attempts >= 100
 ),
 
--- Normalize all features (50-100 scale, within each season)
-qb_normalized AS (
-    SELECT 
+-- Load pre-calculated ratings from temp table (same ratings the app uses)
+qb_ratings AS (
+    SELECT
         player_id,
-        player_name,
         season,
-        attempts,
-        total_pass_epa,
-        pass_success_rate,
-        cpoe,
-        completion_pct,
-        td_rate,
-        turnover_rate,
-        total_wpa,
-        
-        -- Efficiency components
-        50 + 50 * (
-            (total_pass_epa - MIN(total_pass_epa) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(total_pass_epa) OVER (PARTITION BY season) - MIN(total_pass_epa) OVER (PARTITION BY season), 0)
-        ) AS total_pass_epa_norm,
-        
-        50 + 50 * (
-            (pass_success_rate - MIN(pass_success_rate) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(pass_success_rate) OVER (PARTITION BY season) - MIN(pass_success_rate) OVER (PARTITION BY season), 0)
-        ) AS pass_success_rate_norm,
-        
-        50 + 50 * (
-            (cpoe - MIN(cpoe) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(cpoe) OVER (PARTITION BY season) - MIN(cpoe) OVER (PARTITION BY season), 0)
-        ) AS cpoe_norm,
-        
-        -- Impact components
-        50 + 50 * (
-            (total_wpa - MIN(total_wpa) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(total_wpa) OVER (PARTITION BY season) - MIN(total_wpa) OVER (PARTITION BY season), 0)
-        ) AS total_wpa_norm,
-        
-        50 + 50 * (
-            (high_leverage_epa - MIN(high_leverage_epa) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(high_leverage_epa) OVER (PARTITION BY season) - MIN(high_leverage_epa) OVER (PARTITION BY season), 0)
-        ) AS high_leverage_epa_norm,
-        
-        50 + 50 * (
-            (td_rate - MIN(td_rate) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(td_rate) OVER (PARTITION BY season) - MIN(td_rate) OVER (PARTITION BY season), 0)
-        ) AS td_rate_norm,
-        
-        -- Consistency components
-        50 + 50 * (
-            (third_down_success - MIN(third_down_success) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(third_down_success) OVER (PARTITION BY season) - MIN(third_down_success) OVER (PARTITION BY season), 0)
-        ) AS third_down_success_norm,
-        
-        50 + 50 * (
-            (red_zone_epa - MIN(red_zone_epa) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(red_zone_epa) OVER (PARTITION BY season) - MIN(red_zone_epa) OVER (PARTITION BY season), 0)
-        ) AS red_zone_epa_norm,
-        
-        50 + 50 * (
-            (completion_pct - MIN(completion_pct) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(completion_pct) OVER (PARTITION BY season) - MIN(completion_pct) OVER (PARTITION BY season), 0)
-        ) AS completion_pct_norm,
-        
-        -- Volume components
-        50 + 50 * (
-            (pass_yards_per_game - MIN(pass_yards_per_game) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(pass_yards_per_game) OVER (PARTITION BY season) - MIN(pass_yards_per_game) OVER (PARTITION BY season), 0)
-        ) AS pass_yards_per_game_norm,
-        
-        50 + 50 * (
-            (rush_yards_per_game - MIN(rush_yards_per_game) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(rush_yards_per_game) OVER (PARTITION BY season) - MIN(rush_yards_per_game) OVER (PARTITION BY season), 0)
-        ) AS rush_yards_per_game_norm,
-        
-        50 + 50 * (
-            (total_tds_per_game - MIN(total_tds_per_game) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(total_tds_per_game) OVER (PARTITION BY season) - MIN(total_tds_per_game) OVER (PARTITION BY season), 0)
-        ) AS total_tds_per_game_norm,
-        
-        -- Ball security components (inverted - lower is better)
-        50 + 50 * (
-            (MAX(turnover_rate) OVER (PARTITION BY season) - turnover_rate) / 
-            NULLIF(MAX(turnover_rate) OVER (PARTITION BY season) - MIN(turnover_rate) OVER (PARTITION BY season), 0)
-        ) AS turnover_rate_norm,
-        
-        50 + 50 * (
-            (MAX(sack_rate) OVER (PARTITION BY season) - sack_rate) / 
-            NULLIF(MAX(sack_rate) OVER (PARTITION BY season) - MIN(sack_rate) OVER (PARTITION BY season), 0)
-        ) AS sack_rate_norm,
-        
-        -- Pressure performance
-        50 + 50 * (
-            (epa_under_pressure - MIN(epa_under_pressure) OVER (PARTITION BY season)) / 
-            NULLIF(MAX(epa_under_pressure) OVER (PARTITION BY season) - MIN(epa_under_pressure) OVER (PARTITION BY season), 0)
-        ) AS epa_under_pressure_norm
-        
-    FROM qb_season_performance
+        custom_rating
+    FROM temp_qb_ratings
 ),
 
--- Calculate composite rating using exact formula from custom_qb_rating_system.ipynb
-qb_composite_ratings AS (
-    SELECT 
-        *,
-        -- Component scores
-        (0.50 * total_pass_epa_norm + 0.30 * pass_success_rate_norm + 0.20 * cpoe_norm) AS efficiency_score,
-        (0.50 * total_wpa_norm + 0.30 * high_leverage_epa_norm + 0.20 * td_rate_norm) AS impact_score,
-        (0.40 * third_down_success_norm + 0.35 * red_zone_epa_norm + 0.25 * completion_pct_norm) AS consistency_score,
-        (0.40 * pass_yards_per_game_norm + 0.40 * rush_yards_per_game_norm + 0.20 * total_tds_per_game_norm) AS volume_score,
-        (0.40 * turnover_rate_norm + 0.60 * sack_rate_norm) AS ball_security_score,
-        epa_under_pressure_norm AS pressure_score,
-        
-        -- Custom rating (matches custom_qb_rating_system.ipynb formula exactly)
-        ROUND(
-            0.40 * (0.50 * total_pass_epa_norm + 0.30 * pass_success_rate_norm + 0.20 * cpoe_norm) +
-            0.175 * (0.50 * total_wpa_norm + 0.30 * high_leverage_epa_norm + 0.20 * td_rate_norm) +
-            0.20 * (0.40 * third_down_success_norm + 0.35 * red_zone_epa_norm + 0.25 * completion_pct_norm) +
-            0.075 * (0.40 * pass_yards_per_game_norm + 0.40 * rush_yards_per_game_norm + 0.20 * total_tds_per_game_norm) +
-            0.10 * (0.40 * turnover_rate_norm + 0.60 * sack_rate_norm) +
-            0.05 * epa_under_pressure_norm,
-            1
-        ) AS custom_rating
-    FROM qb_normalized
-),
-
--- Merge contracts with performance
+-- Merge contracts with performance (use pre-calculated ratings)
 qb_value_base AS (
     SELECT 
-        r.player_name,
-        r.player_id,
-        r.season,
+        s.player_name,
+        s.player_id,
+        s.season,
         c.team AS contract_team,
-        r.attempts,
+        s.attempts,
         r.custom_rating,
         c.apy AS salary,
         c.total_value,
@@ -205,21 +96,24 @@ qb_value_base AS (
         c.contract_length,
         
         -- Calculate salary percentile within season
-        100.0 * PERCENT_RANK() OVER (PARTITION BY r.season ORDER BY c.apy) AS salary_percentile,
+        100.0 * PERCENT_RANK() OVER (PARTITION BY s.season ORDER BY c.apy) AS salary_percentile,
         
         -- Performance metrics
-        r.total_pass_epa,
-        r.cpoe,
-        r.pass_success_rate,
-        r.completion_pct,
-        r.td_rate,
-        r.turnover_rate,
-        r.total_wpa
+        s.total_pass_epa,
+        s.cpoe,
+        s.pass_success_rate,
+        s.completion_pct,
+        s.td_rate,
+        s.turnover_rate,
+        s.total_wpa
         
-    FROM qb_composite_ratings r
+    FROM qb_stats s
     INNER JOIN contract_years c
-        ON r.player_id = c.player_id 
-        AND r.season = c.season
+        ON s.player_id = c.player_id 
+        AND s.season = c.season
+    INNER JOIN qb_ratings r
+        ON s.player_id = r.player_id
+        AND s.season = r.season
     WHERE c.apy > 0  -- Filter out rookie contracts and missing data
 )
 
@@ -267,17 +161,15 @@ SELECT
     contract_length
 
 FROM qb_value_base
-ORDER BY season DESC, value_score DESC;
+ORDER BY custom_rating DESC;
 """
 
 print("="*80)
 print("Creating qb_contract_value view...")
 print("="*80)
 
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
 # Drop existing view if it exists
+cursor = conn.cursor()
 cursor.execute("DROP VIEW IF EXISTS qb_contract_value")
 print("[OK] Dropped old view (if existed)")
 
@@ -321,7 +213,7 @@ SELECT
     value_score,
     value_category
 FROM qb_contract_value
-ORDER BY value_score DESC
+ORDER BY custom_rating DESC
 LIMIT 5
 """
 
@@ -342,7 +234,7 @@ SELECT
     value_score,
     value_category
 FROM qb_contract_value
-ORDER BY value_score ASC
+ORDER BY custom_rating DESC, value_score ASC
 LIMIT 5
 """
 
@@ -368,11 +260,11 @@ print("\n" + "="*80)
 print("Exporting to CSV for Streamlit deployment...")
 print("="*80)
 
-conn = sqlite3.connect(db_path)
-export_df = pd.read_sql_query("SELECT * FROM qb_contract_value", conn)
-conn.close()
+conn_export = sqlite3.connect(db_path)
+export_df = pd.read_sql_query("SELECT * FROM qb_contract_value", conn_export)
+conn_export.close()
 
-csv_output_path = '../modeling/models/qb_contract_value.csv'
+csv_output_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/qb_contract_value.csv'
 export_df.to_csv(csv_output_path, index=False)
 
 print(f"[OK] Exported {len(export_df)} records to {csv_output_path}")
