@@ -305,6 +305,7 @@ with tabs[0]:
                 'mobility': latest_season['mobility_rating'],
                 'accuracy': latest_season['accuracy_rating'],
                 'ball_security': latest_season['ball_security_rating'],
+                'pocket_presence': latest_season['pocket_presence_rating'],
                 'playmaking': latest_season['playmaking_rating'],
                 'epa': latest_season.get('total_pass_epa', 0),
                 'cpoe': latest_season.get('cpoe', 0)
@@ -338,16 +339,25 @@ with tabs[0]:
         
         display_df = filtered_rankings[[
             'rank', 'player_name', 'weighted_rating', 'recent_rating', 'career_rating',
-            'seasons_played', 'archetype', 'epa', 'cpoe'
+            'seasons_played', 'archetype', 'mobility', 'accuracy', 'ball_security', 
+            'pocket_presence', 'playmaking', 'epa', 'cpoe'
         ]].copy()
         
-        display_df.columns = ['Rank', 'Player', 'Overall Score', '2024-25 Avg', 'Career Avg', 
-                             'Seasons', 'Playstyle', 'EPA', 'CPOE']
+        display_df.columns = ['Rank', 'Player', 'Overall Score', 
+                             '2024-25 (70%)', 'Career (30%)', 
+                             'Seasons', 'Playstyle', 
+                             'Mobility', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking',
+                             'EPA', 'CPOE']
         
-        # Round numeric columns
+        # Round numeric columns to 1 decimal
         display_df['Overall Score'] = display_df['Overall Score'].round(1)
-        display_df['2024-25 Avg'] = display_df['2024-25 Avg'].round(1)
-        display_df['Career Avg'] = display_df['Career Avg'].round(1)
+        display_df['2024-25 (70%)'] = display_df['2024-25 (70%)'].round(1)
+        display_df['Career (30%)'] = display_df['Career (30%)'].round(1)
+        display_df['Mobility'] = display_df['Mobility'].round(1)
+        display_df['Accuracy'] = display_df['Accuracy'].round(1)
+        display_df['Ball Security'] = display_df['Ball Security'].round(1)
+        display_df['Pocket'] = display_df['Pocket'].round(1)
+        display_df['Playmaking'] = display_df['Playmaking'].round(1)
         display_df['EPA'] = display_df['EPA'].round(1)
         display_df['CPOE'] = display_df['CPOE'].round(1)
         
@@ -374,7 +384,23 @@ with tabs[0]:
             else:
                 return 'background-color: #e74c3c; color: white'
         
-        styled_df = display_df.style.applymap(color_rank, subset=['Rank']).applymap(color_rating, subset=['Overall Score', '2024-25 Avg', 'Career Avg'])
+        styled_df = display_df.style\
+            .applymap(color_rank, subset=['Rank'])\
+            .applymap(color_rating, subset=['Overall Score', '2024-25 (70%)', 'Career (30%)'])\
+            .applymap(lambda v: 'background-color: #ecf0f1' if v >= 80 else '', 
+                     subset=['Mobility', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking'])\
+            .format({
+                'Overall Score': '{:.1f}',
+                '2024-25 (70%)': '{:.1f}',
+                'Career (30%)': '{:.1f}',
+                'Mobility': '{:.1f}',
+                'Accuracy': '{:.1f}',
+                'Ball Security': '{:.1f}',
+                'Pocket': '{:.1f}',
+                'Playmaking': '{:.1f}',
+                'EPA': '{:.1f}',
+                'CPOE': '{:.1f}'
+            })
         
         st.dataframe(styled_df, use_container_width=True, height=600)
         
@@ -443,13 +469,13 @@ with tabs[0]:
             compare_data = filtered_rankings[filtered_rankings['player_name'].isin(compare_qbs)]
             
             # Radar chart
-            categories = ['Mobility', 'Accuracy', 'Ball Security', 'Playmaking']
+            categories = ['Mobility', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
             
             fig_radar = go.Figure()
             
             for _, qb in compare_data.iterrows():
                 fig_radar.add_trace(go.Scatterpolar(
-                    r=[qb['mobility'], qb['accuracy'], qb['ball_security'], qb['playmaking']],
+                    r=[qb['mobility'], qb['accuracy'], qb['ball_security'], qb['pocket_presence'], qb['playmaking']],
                     theta=categories,
                     fill='toself',
                     name=qb['player_name']
@@ -471,7 +497,9 @@ with tabs[0]:
             ]].copy()
             
             compare_table.columns = ['Rank', 'Player', 'Overall', '2024-25', 'Career', 'Seasons', 'Att', 'Style']
-            compare_table = compare_table.round(1)
+            compare_table['Overall'] = compare_table['Overall'].round(1)
+            compare_table['2024-25'] = compare_table['2024-25'].round(1)
+            compare_table['Career'] = compare_table['Career'].round(1)
             
             st.dataframe(compare_table, use_container_width=True, hide_index=True)
         
