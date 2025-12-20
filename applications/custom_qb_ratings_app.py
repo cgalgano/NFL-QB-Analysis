@@ -197,7 +197,7 @@ def rating_explanation():
     - **Efficiency (30%)**: Total Pass EPA (50%) + Success Rate (30%) + CPOE (20%)
     - **Impact (17.5%)**: Total WPA (50%) + High Leverage EPA (30%) + TD Rate (20%)
     - **Consistency (22.5%)**: 3rd Down Success (40%) + Red Zone EPA (35%) + Completion % (25%)
-    - **Volume (10%)**: Passing Yards (40%) + Rush Yds/Game (40%) + Total TDs (20%)
+    - **Volume (10%)**: Pass Yards/Game (40%) + Rush Yards/Game (40%) + Total TDs/Game (20%)
     - **Ball Security (10%)**: Turnover Rate inverted (40%) + Sack Rate inverted (60%)
     - **Pressure Performance (10%)**: EPA Under Pressure (100%)
     
@@ -814,7 +814,7 @@ with tabs[3]:
     - **Efficiency (30%)**: How much value created per play (EPA, Success Rate, CPOE)
     - **Impact (17.5%)**: Big plays and clutch performance (WPA, High Leverage EPA, TD Rate)
     - **Consistency (22.5%)**: Performance in key situations (3rd downs, red zone, completion %)
-    - **Volume (10%)**: Raw production (passing yards, rush yards/game, total TDs)
+    - **Volume (10%)**: Raw production per game (pass yards/game, rush yards/game, total TDs/game)
     - **Ball Security (10%)**: Avoiding mistakes (low turnover rate, low sack rate)
     - **Pressure Performance (10%)**: Effectiveness when under pressure
     
