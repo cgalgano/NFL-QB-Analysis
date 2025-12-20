@@ -17,6 +17,7 @@ qb_plays_flagged AS (
         player_name,
         player_id,
         season,
+        game_id,
         -- Play types
         qb_dropback,
         rush_attempt,
@@ -57,6 +58,7 @@ season_agg AS (
         season,
         
         -- VOLUME METRICS
+        COUNT(DISTINCT game_id) AS games_played,
         SUM(qb_dropback) AS attempts,
         
         -- PASSING EFFICIENCY
@@ -91,9 +93,9 @@ season_agg AS (
         
         -- VOLUME STATS (per game)
         SUM(rush_attempt) AS rush_attempts,
-        SUM(rushing_yards) / 17.0 AS rush_yards_per_game,
-        SUM(passing_yards) / 17.0 AS pass_yards_per_game,
-        (SUM(pass_touchdown) + SUM(rush_touchdown)) / 17.0 AS total_tds_per_game,
+        SUM(rushing_yards) / CAST(COUNT(DISTINCT game_id) AS FLOAT) AS rush_yards_per_game,
+        SUM(passing_yards) / CAST(COUNT(DISTINCT game_id) AS FLOAT) AS pass_yards_per_game,
+        (SUM(pass_touchdown) + SUM(rush_touchdown)) / CAST(COUNT(DISTINCT game_id) AS FLOAT) AS total_tds_per_game,
         
         -- CLUTCH/WPA
         SUM(wpa) AS total_wpa,
@@ -108,6 +110,7 @@ SELECT
     s.player_name,
     s.player_id,
     s.season,
+    s.games_played,
     s.attempts,
     
     -- Passing metrics
