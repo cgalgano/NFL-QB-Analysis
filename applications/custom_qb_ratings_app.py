@@ -194,12 +194,12 @@ def rating_explanation():
     - **Playmaking**: Total EPA per play (impact on every snap)
     
     #### Custom Rating Formula Weights:
-    - **Efficiency (40%)**: Total Pass EPA (50%) + Success Rate (30%) + CPOE (20%)
+    - **Efficiency (30%)**: Total Pass EPA (50%) + Success Rate (30%) + CPOE (20%)
     - **Impact (17.5%)**: Total WPA (50%) + High Leverage EPA (30%) + TD Rate (20%)
-    - **Consistency (20%)**: 3rd Down Success (40%) + Red Zone EPA (35%) + Completion % (25%)
-    - **Volume (7.5%)**: Passing Yards (40%) + Rush Yds/Game (30%) + Total TDs (30%)
+    - **Consistency (22.5%)**: 3rd Down Success (40%) + Red Zone EPA (35%) + Completion % (25%)
+    - **Volume (10%)**: Passing Yards (40%) + Rush Yds/Game (40%) + Total TDs (20%)
     - **Ball Security (10%)**: Turnover Rate inverted (40%) + Sack Rate inverted (60%)
-    - **Pressure Performance (5%)**: EPA Under Pressure (100%)
+    - **Pressure Performance (10%)**: EPA Under Pressure (100%)
     
     **Data Source**: Play-by-play data (2010-2025) aggregated to season level. Minimum 150 attempts per season.
     """)
@@ -338,29 +338,29 @@ with tabs[0]:
         
         display_df = filtered_rankings[[
             'rank', 'player_name', 'weighted_rating', 'recent_rating', 'career_rating',
-            'seasons_played', 'archetype', 'mobility', 'aggression', 'accuracy', 
-            'ball_security', 'pocket_presence', 'playmaking'
+            'seasons_played', 'archetype', 'playmaking', 'aggression', 'accuracy', 
+            'ball_security', 'pocket_presence', 'mobility'
         ]].copy()
         
         display_df.columns = ['Rank', 'Player', 'Overall Score', 
                              '2024-25 (70%)', 'Career (30%)', 
                              'Seasons', 'Playstyle', 
-                             'Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
+                             'Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Mobility']
         
         # Round numeric columns to 1 decimal
         display_df['Overall Score'] = display_df['Overall Score'].round(1)
         display_df['2024-25 (70%)'] = display_df['2024-25 (70%)'].round(1)
         display_df['Career (30%)'] = display_df['Career (30%)'].round(1)
-        display_df['Mobility'] = display_df['Mobility'].round(1)
+        display_df['Playmaking'] = display_df['Playmaking'].round(1)
         display_df['Aggression'] = display_df['Aggression'].round(1)
         display_df['Accuracy'] = display_df['Accuracy'].round(1)
         display_df['Ball Security'] = display_df['Ball Security'].round(1)
         display_df['Pocket'] = display_df['Pocket'].round(1)
-        display_df['Playmaking'] = display_df['Playmaking'].round(1)
+        display_df['Mobility'] = display_df['Mobility'].round(1)
         
         # Style the dataframe using RdYlGn gradient like Top 32 QBs tab
         gradient_cols = ['Overall Score', '2024-25 (70%)', 'Career (30%)', 
-                        'Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
+                        'Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Mobility']
         
         styled_df = display_df.style\
             .background_gradient(subset=gradient_cols, cmap='RdYlGn', vmin=50, vmax=100)\
@@ -368,12 +368,12 @@ with tabs[0]:
                 'Overall Score': '{:.1f}',
                 '2024-25 (70%)': '{:.1f}',
                 'Career (30%)': '{:.1f}',
-                'Mobility': '{:.1f}',
+                'Playmaking': '{:.1f}',
                 'Aggression': '{:.1f}',
                 'Accuracy': '{:.1f}',
                 'Ball Security': '{:.1f}',
                 'Pocket': '{:.1f}',
-                'Playmaking': '{:.1f}'
+                'Mobility': '{:.1f}'
             })
         
         st.dataframe(styled_df, use_container_width=True, height=600)
@@ -448,8 +448,8 @@ with tabs[0]:
         with viz_col3:
             # Playstyle attribute heatmap
             top_qbs = filtered_rankings.head(15).copy()
-            heatmap_data = top_qbs[['player_name', 'mobility', 'aggression', 'accuracy', 'ball_security', 'pocket_presence', 'playmaking']].set_index('player_name')
-            heatmap_data.columns = ['Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
+            heatmap_data = top_qbs[['player_name', 'playmaking', 'aggression', 'accuracy', 'ball_security', 'pocket_presence', 'mobility']].set_index('player_name')
+            heatmap_data.columns = ['Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Mobility']
             
             fig_heat = px.imshow(
                 heatmap_data.T,
@@ -516,13 +516,13 @@ with tabs[0]:
             compare_data = filtered_rankings[filtered_rankings['player_name'].isin(compare_qbs)]
             
             # Radar chart
-            categories = ['Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
+            categories = ['Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Mobility']
             
             fig_radar = go.Figure()
             
             for _, qb in compare_data.iterrows():
                 fig_radar.add_trace(go.Scatterpolar(
-                    r=[qb['mobility'], qb['aggression'], qb['accuracy'], qb['ball_security'], qb['pocket_presence'], qb['playmaking']],
+                    r=[qb['playmaking'], qb['aggression'], qb['accuracy'], qb['ball_security'], qb['pocket_presence'], qb['mobility']],
                     theta=categories,
                     fill='toself',
                     name=qb['player_name']
@@ -787,18 +787,18 @@ with tabs[3]:
         'Rank': 'Rank',
         'display_name': 'QB Name',
         'custom_rating': 'Overall',
-        'efficiency_score': 'Efficiency (40%)',
-        'impact_score': 'Impact (20%)',
-        'consistency_score': 'Consistency (20%)',
-        'volume_score': 'Volume (5%)',
+        'efficiency_score': 'Efficiency (30%)',
+        'impact_score': 'Impact (17.5%)',
+        'consistency_score': 'Consistency (22.5%)',
+        'volume_score': 'Volume (10%)',
         'ball_security_score': 'Ball Security (10%)',
-        'pressure_score': 'Pressure (5%)'
+        'pressure_score': 'Pressure (10%)'
     }
     
     table = display_df[show_cols].rename(columns=rename_dict)
     gradient_cols = [
-        'Overall', 'Efficiency (40%)', 'Impact (20%)', 'Consistency (20%)',
-        'Volume (5%)', 'Ball Security (10%)', 'Pressure (5%)'
+        'Overall', 'Efficiency (30%)', 'Impact (17.5%)', 'Consistency (22.5%)',
+        'Volume (10%)', 'Ball Security (10%)', 'Pressure (10%)'
     ]
     format_dict = {col: "{:.1f}" for col in gradient_cols}
     
@@ -812,12 +812,12 @@ with tabs[3]:
     
     Each component is normalized to a 50-100 scale and weighted to create the overall rating:
     
-    - **Efficiency (40%)**: How much value created per play (EPA, Success Rate, CPOE)
-    - **Impact (20%)**: Big plays and clutch performance (WPA, High Leverage EPA, TD Rate)
-    - **Consistency (20%)**: Performance in key situations (3rd downs, red zone, completion %)
-    - **Volume (5%)**: Raw production (passing yards, rush yards/game, total TDs)
+    - **Efficiency (30%)**: How much value created per play (EPA, Success Rate, CPOE)
+    - **Impact (17.5%)**: Big plays and clutch performance (WPA, High Leverage EPA, TD Rate)
+    - **Consistency (22.5%)**: Performance in key situations (3rd downs, red zone, completion %)
+    - **Volume (10%)**: Raw production (passing yards, rush yards/game, total TDs)
     - **Ball Security (10%)**: Avoiding mistakes (low turnover rate, low sack rate)
-    - **Pressure Performance (5%)**: Effectiveness when under pressure
+    - **Pressure Performance (10%)**: Effectiveness when under pressure
     
     **Higher scores are better** - Each component ranges from 50 (worst) to 100 (best).
     """)
@@ -999,9 +999,9 @@ with tabs[6]:
     ### Comparing Two Approaches to QB Rating
     
     **Custom Rating (Formula-Based)**:
-    - Transparent weighted formula: 40% Efficiency + 20% Impact + 20% Consistency + 5% Volume + 10% Ball Security + 5% Pressure
+    - Transparent weighted formula: 30% Efficiency + 17.5% Impact + 22.5% Consistency + 10% Volume + 10% Ball Security + 10% Pressure
     - Scale: 50-100 (traditional grading)
-    - Philosophy: Values efficiency, ball security, and pressure performance equally across all QBs
+    - Philosophy: Balances efficiency with situational performance, ball security, and pressure execution
     
     **ML Composite Rating (Model-Based)**:
     - Machine learning models trained to predict QBR and ELO from play-by-play features
