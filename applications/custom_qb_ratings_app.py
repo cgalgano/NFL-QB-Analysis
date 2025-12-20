@@ -303,12 +303,11 @@ with tabs[0]:
                 'total_attempts': total_attempts,
                 'archetype': latest_season.get('archetype', 'N/A'),
                 'mobility': latest_season['mobility_rating'],
+                'aggression': latest_season['aggression_rating'],
                 'accuracy': latest_season['accuracy_rating'],
                 'ball_security': latest_season['ball_security_rating'],
                 'pocket_presence': latest_season['pocket_presence_rating'],
-                'playmaking': latest_season['playmaking_rating'],
-                'epa': latest_season.get('total_pass_epa', 0),
-                'cpoe': latest_season.get('cpoe', 0)
+                'playmaking': latest_season['playmaking_rating']
             })
         
         # Create rankings dataframe
@@ -339,120 +338,168 @@ with tabs[0]:
         
         display_df = filtered_rankings[[
             'rank', 'player_name', 'weighted_rating', 'recent_rating', 'career_rating',
-            'seasons_played', 'archetype', 'mobility', 'accuracy', 'ball_security', 
-            'pocket_presence', 'playmaking', 'epa', 'cpoe'
+            'seasons_played', 'archetype', 'mobility', 'aggression', 'accuracy', 
+            'ball_security', 'pocket_presence', 'playmaking'
         ]].copy()
         
         display_df.columns = ['Rank', 'Player', 'Overall Score', 
                              '2024-25 (70%)', 'Career (30%)', 
                              'Seasons', 'Playstyle', 
-                             'Mobility', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking',
-                             'EPA', 'CPOE']
+                             'Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
         
         # Round numeric columns to 1 decimal
         display_df['Overall Score'] = display_df['Overall Score'].round(1)
         display_df['2024-25 (70%)'] = display_df['2024-25 (70%)'].round(1)
         display_df['Career (30%)'] = display_df['Career (30%)'].round(1)
         display_df['Mobility'] = display_df['Mobility'].round(1)
+        display_df['Aggression'] = display_df['Aggression'].round(1)
         display_df['Accuracy'] = display_df['Accuracy'].round(1)
         display_df['Ball Security'] = display_df['Ball Security'].round(1)
         display_df['Pocket'] = display_df['Pocket'].round(1)
         display_df['Playmaking'] = display_df['Playmaking'].round(1)
-        display_df['EPA'] = display_df['EPA'].round(1)
-        display_df['CPOE'] = display_df['CPOE'].round(1)
         
-        # Style the dataframe
-        def color_rank(val):
-            if val <= 5:
-                return 'background-color: #2ecc71; color: white; font-weight: bold'
-            elif val <= 10:
-                return 'background-color: #27ae60; color: white'
-            elif val <= 20:
-                return 'background-color: #f39c12; color: white'
-            else:
-                return ''
-        
-        def color_rating(val):
-            if val >= 85:
-                return 'background-color: #2ecc71; color: white; font-weight: bold'
-            elif val >= 80:
-                return 'background-color: #27ae60; color: white'
-            elif val >= 75:
-                return 'background-color: #f39c12; color: white'
-            elif val >= 70:
-                return 'background-color: #e67e22; color: white'
-            else:
-                return 'background-color: #e74c3c; color: white'
+        # Style the dataframe using RdYlGn gradient like Top 32 QBs tab
+        gradient_cols = ['Overall Score', '2024-25 (70%)', 'Career (30%)', 
+                        'Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
         
         styled_df = display_df.style\
-            .applymap(color_rank, subset=['Rank'])\
-            .applymap(color_rating, subset=['Overall Score', '2024-25 (70%)', 'Career (30%)'])\
-            .applymap(lambda v: 'background-color: #ecf0f1' if v >= 80 else '', 
-                     subset=['Mobility', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking'])\
+            .background_gradient(subset=gradient_cols, cmap='RdYlGn', vmin=50, vmax=100)\
             .format({
                 'Overall Score': '{:.1f}',
                 '2024-25 (70%)': '{:.1f}',
                 'Career (30%)': '{:.1f}',
                 'Mobility': '{:.1f}',
+                'Aggression': '{:.1f}',
                 'Accuracy': '{:.1f}',
                 'Ball Security': '{:.1f}',
                 'Pocket': '{:.1f}',
-                'Playmaking': '{:.1f}',
-                'EPA': '{:.1f}',
-                'CPOE': '{:.1f}'
+                'Playmaking': '{:.1f}'
             })
         
         st.dataframe(styled_df, use_container_width=True, height=600)
         
         # Visualizations
         st.markdown("---")
-        st.subheader("Rankings Visualization")
+        st.subheader("Rankings Insights")
         
         viz_col1, viz_col2 = st.columns(2)
         
         with viz_col1:
-            # Bar chart of top QBs
-            fig_bar = px.bar(
-                filtered_rankings.head(15),
-                x='weighted_rating',
+            # Career trajectory: Improving vs Declining
+            filtered_rankings['trajectory'] = filtered_rankings['recent_rating'] - filtered_rankings['career_rating']
+            
+            fig_trajectory = px.bar(
+                filtered_rankings.head(20).sort_values('trajectory', ascending=True),
+                x='trajectory',
                 y='player_name',
                 orientation='h',
-                labels={'weighted_rating': 'Overall Score', 'player_name': 'Player'},
-                title='Top 15 QBs - Overall Score',
-                color='weighted_rating',
-                color_continuous_scale='RdYlGn'
+                labels={'trajectory': 'Rating Change (Recent - Career)', 'player_name': 'Player'},
+                title='🔥 Hot vs ❄️ Cold: Who\'s Improving/Declining?',
+                color='trajectory',
+                color_continuous_scale='RdYlGn',
+                color_continuous_midpoint=0
             )
-            fig_bar.update_layout(yaxis={'categoryorder': 'total ascending'}, height=500)
-            st.plotly_chart(fig_bar, use_container_width=True)
+            fig_trajectory.update_layout(
+                yaxis={'categoryorder': 'total ascending'}, 
+                height=500,
+                xaxis_title='Negative = Declining | Positive = Improving'
+            )
+            fig_trajectory.add_vline(x=0, line_dash="dash", line_color="gray")
+            st.plotly_chart(fig_trajectory, use_container_width=True)
+            
+            st.caption("**Green (Right)**: Playing better than career average | **Red (Left)**: Declining from peak")
         
         with viz_col2:
-            # Scatter: Recent vs Career performance
-            fig_scatter = px.scatter(
+            # Experience vs Performance
+            fig_exp = px.scatter(
                 filtered_rankings,
-                x='career_rating',
-                y='recent_rating',
+                x='seasons_played',
+                y='weighted_rating',
                 size='total_attempts',
-                color='weighted_rating',
-                hover_data=['player_name', 'seasons_played', 'archetype'],
-                labels={'career_rating': 'Career Average Rating', 'recent_rating': '2024-25 Average Rating'},
-                title='Recent Performance vs Career Average',
-                color_continuous_scale='RdYlGn'
+                color='archetype',
+                hover_data={
+                    'player_name': True,
+                    'seasons_played': ':.0f',
+                    'weighted_rating': ':.1f',
+                    'total_attempts': ':.0f',
+                    'recent_rating': ':.1f',
+                    'career_rating': ':.1f',
+                    'archetype': True
+                },
+                labels={
+                    'seasons_played': 'Seasons Played',
+                    'weighted_rating': 'Overall Score',
+                    'player_name': 'Player',
+                    'total_attempts': 'Total Attempts',
+                    'recent_rating': '2024-25 Rating',
+                    'career_rating': 'Career Rating',
+                    'archetype': 'Playstyle'
+                },
+                title='⏱️ Experience vs Performance',
+            )
+            fig_exp.update_layout(height=500, showlegend=True)
+            st.plotly_chart(fig_exp, use_container_width=True)
+            
+            st.caption("**Bubble size** = Career attempts | **Top-right** = Elite veterans | **Top-left** = Elite young players")
+        
+        # New row: Attribute hexbin and Prime years analysis
+        viz_col3, viz_col4 = st.columns(2)
+        
+        with viz_col3:
+            # Playstyle attribute heatmap
+            top_qbs = filtered_rankings.head(15).copy()
+            heatmap_data = top_qbs[['player_name', 'mobility', 'aggression', 'accuracy', 'ball_security', 'pocket_presence', 'playmaking']].set_index('player_name')
+            heatmap_data.columns = ['Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
+            
+            fig_heat = px.imshow(
+                heatmap_data.T,
+                labels=dict(x="Player", y="Attribute", color="Rating"),
+                title="🎯 Top 15 QBs - Attribute Strengths",
+                color_continuous_scale='RdYlGn',
+                aspect="auto"
+            )
+            fig_heat.update_xaxes(side="bottom", tickangle=-45)
+            fig_heat.update_layout(height=400)
+            st.plotly_chart(fig_heat, use_container_width=True)
+            
+            st.caption("**Darker green** = Strength | **Yellow/Red** = Weakness")
+        
+        with viz_col4:
+            # Prime vs Past Prime analysis
+            filtered_rankings['prime_status'] = filtered_rankings['seasons_played'].apply(
+                lambda x: 'Rookie/2nd Year' if x <= 2 else 
+                         ('Prime Years (3-10)' if x <= 10 else 'Veteran (11+)')
             )
             
-            # Add diagonal line (where recent = career)
-            fig_scatter.add_trace(
-                go.Scatter(
-                    x=[60, 95],
-                    y=[60, 95],
-                    mode='lines',
-                    line=dict(color='gray', dash='dash'),
-                    showlegend=False,
-                    hoverinfo='skip'
-                )
+            fig_prime = px.box(
+                filtered_rankings,
+                x='prime_status',
+                y='weighted_rating',
+                color='prime_status',
+                points='all',
+                hover_data={
+                    'player_name': True,
+                    'weighted_rating': ':.1f',
+                    'seasons_played': True,
+                    'prime_status': False
+                },
+                labels={
+                    'prime_status': 'Career Stage',
+                    'weighted_rating': 'Overall Score',
+                    'player_name': 'Player'
+                },
+                title='📊 Performance by Career Stage',
+                color_discrete_map={
+                    'Rookie/2nd Year': '#3498db',
+                    'Prime Years (3-10)': '#2ecc71',
+                    'Veteran (11+)': '#e67e22'
+                }
             )
+            fig_prime.update_layout(height=400, showlegend=False)
+            fig_prime.update_xaxes(tickangle=-20)
+            st.plotly_chart(fig_prime, use_container_width=True)
             
-            fig_scatter.update_layout(height=500)
-            st.plotly_chart(fig_scatter, use_container_width=True)
+            st.caption("**Distribution shows**: Are veterans maintaining elite play? Are young QBs outperforming expectations?")
         
         # Individual QB comparison
         st.markdown("---")
@@ -469,13 +516,13 @@ with tabs[0]:
             compare_data = filtered_rankings[filtered_rankings['player_name'].isin(compare_qbs)]
             
             # Radar chart
-            categories = ['Mobility', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
+            categories = ['Mobility', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Playmaking']
             
             fig_radar = go.Figure()
             
             for _, qb in compare_data.iterrows():
                 fig_radar.add_trace(go.Scatterpolar(
-                    r=[qb['mobility'], qb['accuracy'], qb['ball_security'], qb['pocket_presence'], qb['playmaking']],
+                    r=[qb['mobility'], qb['aggression'], qb['accuracy'], qb['ball_security'], qb['pocket_presence'], qb['playmaking']],
                     theta=categories,
                     fill='toself',
                     name=qb['player_name']
