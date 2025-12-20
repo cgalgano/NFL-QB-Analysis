@@ -220,10 +220,305 @@ with col2:
         refresh_dt = datetime.fromisoformat(last_refresh)
         st.caption(f"📅 Data as of: {refresh_dt.strftime('%Y-%m-%d')}")
 
-tabs = st.tabs(["Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map", "Contract Value Analysis"])
+tabs = st.tabs(["Best QBs Right Now", "Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map", "Contract Value Analysis"])
 
-# --- Tab 1: Top 32 QBs Table ---
+# --- Tab 1: Best QBs Right Now (Current Players Ranked by Weighted Recent + Career Performance) ---
 with tabs[0]:
+    st.header("🏆 Best Quarterbacks Right Now")
+    st.markdown("**If you had to draft a QB today, who would you pick?**")
+    st.markdown("Rankings combine recent performance (2024-2025 heavily weighted) with full career history for current active players.")
+    
+    try:
+        # Define current players as those who played in 2024 or 2025
+        current_seasons = [2024, 2025]
+        current_players = df[df['season'].isin(current_seasons)]['player_name'].unique()
+        current_df = df[df['player_name'].isin(current_players)].copy()
+        
+        # Calculate weighted rating for each QB
+        rankings = []
+        
+        for qb in current_players:
+            qb_data = current_df[current_df['player_name'] == qb].sort_values('season')
+            
+            if len(qb_data) == 0:
+                continue
+            
+            # Get most recent season data
+            latest_season = qb_data.iloc[-1]
+            
+            # Separate recent (2024-2025) and historical data
+            recent_data = qb_data[qb_data['season'].isin([2024, 2025])]
+            historical_data = qb_data[~qb_data['season'].isin([2024, 2025])]
+            
+            # Calculate weighted components
+            if len(recent_data) > 0:
+                # Recent performance (70% weight) - average of 2024-2025
+                recent_rating = recent_data['custom_rating'].mean()
+                recent_weight = 0.70
+            else:
+                recent_rating = 0
+                recent_weight = 0
+            
+            # Career performance (30% weight)
+            if len(historical_data) > 0:
+                # Weight more recent historical years more (last 3 years = 50%, rest = 50%)
+                last_3_years = historical_data[historical_data['season'] >= 2021]
+                older_years = historical_data[historical_data['season'] < 2021]
+                
+                if len(last_3_years) > 0 and len(older_years) > 0:
+                    career_rating = (last_3_years['custom_rating'].mean() * 0.7 + 
+                                   older_years['custom_rating'].mean() * 0.3)
+                elif len(last_3_years) > 0:
+                    career_rating = last_3_years['custom_rating'].mean()
+                else:
+                    career_rating = older_years['custom_rating'].mean()
+                
+                career_weight = 0.30
+            else:
+                # No historical data means rookie/new player - use only recent
+                career_rating = recent_rating
+                career_weight = 0.0
+                recent_weight = 1.0
+            
+            # Final weighted rating
+            if recent_weight + career_weight > 0:
+                weighted_rating = (recent_rating * recent_weight + career_rating * career_weight)
+            else:
+                weighted_rating = latest_season['custom_rating']
+            
+            # Get additional context
+            total_seasons = len(qb_data)
+            total_attempts = qb_data['attempts'].sum()
+            seasons_played = sorted(qb_data['season'].unique())
+            
+            rankings.append({
+                'player_name': qb,
+                'weighted_rating': weighted_rating,
+                'recent_rating': recent_rating if len(recent_data) > 0 else latest_season['custom_rating'],
+                'career_rating': qb_data['custom_rating'].mean(),
+                'latest_season': latest_season['season'],
+                'seasons_played': len(seasons_played),
+                'first_season': min(seasons_played),
+                'last_season': max(seasons_played),
+                'total_attempts': total_attempts,
+                'archetype': latest_season.get('archetype', 'N/A'),
+                'mobility': latest_season['mobility_rating'],
+                'accuracy': latest_season['accuracy_rating'],
+                'ball_security': latest_season['ball_security_rating'],
+                'playmaking': latest_season['playmaking_rating'],
+                'epa': latest_season.get('total_pass_epa', 0),
+                'cpoe': latest_season.get('cpoe', 0)
+            })
+        
+        # Create rankings dataframe
+        rankings_df = pd.DataFrame(rankings).sort_values('weighted_rating', ascending=False).reset_index(drop=True)
+        rankings_df['rank'] = range(1, len(rankings_df) + 1)
+        
+        # Filters
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            min_seasons = st.slider("Minimum Seasons Played", 1, int(rankings_df['seasons_played'].max()), 1, key="min_seasons_filter")
+        
+        with col2:
+            min_attempts = st.slider("Minimum Career Attempts", 0, int(rankings_df['total_attempts'].max()), 500, step=100, key="min_attempts_filter")
+        
+        with col3:
+            show_top_n = st.slider("Show Top N QBs", 10, 50, 25, step=5, key="show_top_n")
+        
+        # Apply filters
+        filtered_rankings = rankings_df[
+            (rankings_df['seasons_played'] >= min_seasons) &
+            (rankings_df['total_attempts'] >= min_attempts)
+        ].head(show_top_n)
+        
+        # Display rankings table
+        st.markdown("---")
+        st.subheader(f"Top {len(filtered_rankings)} Current QBs")
+        
+        display_df = filtered_rankings[[
+            'rank', 'player_name', 'weighted_rating', 'recent_rating', 'career_rating',
+            'seasons_played', 'archetype', 'epa', 'cpoe'
+        ]].copy()
+        
+        display_df.columns = ['Rank', 'Player', 'Overall Score', '2024-25 Avg', 'Career Avg', 
+                             'Seasons', 'Playstyle', 'EPA', 'CPOE']
+        
+        # Round numeric columns
+        display_df['Overall Score'] = display_df['Overall Score'].round(1)
+        display_df['2024-25 Avg'] = display_df['2024-25 Avg'].round(1)
+        display_df['Career Avg'] = display_df['Career Avg'].round(1)
+        display_df['EPA'] = display_df['EPA'].round(1)
+        display_df['CPOE'] = display_df['CPOE'].round(1)
+        
+        # Style the dataframe
+        def color_rank(val):
+            if val <= 5:
+                return 'background-color: #2ecc71; color: white; font-weight: bold'
+            elif val <= 10:
+                return 'background-color: #27ae60; color: white'
+            elif val <= 20:
+                return 'background-color: #f39c12; color: white'
+            else:
+                return ''
+        
+        def color_rating(val):
+            if val >= 85:
+                return 'background-color: #2ecc71; color: white; font-weight: bold'
+            elif val >= 80:
+                return 'background-color: #27ae60; color: white'
+            elif val >= 75:
+                return 'background-color: #f39c12; color: white'
+            elif val >= 70:
+                return 'background-color: #e67e22; color: white'
+            else:
+                return 'background-color: #e74c3c; color: white'
+        
+        styled_df = display_df.style.applymap(color_rank, subset=['Rank']).applymap(color_rating, subset=['Overall Score', '2024-25 Avg', 'Career Avg'])
+        
+        st.dataframe(styled_df, use_container_width=True, height=600)
+        
+        # Visualizations
+        st.markdown("---")
+        st.subheader("Rankings Visualization")
+        
+        viz_col1, viz_col2 = st.columns(2)
+        
+        with viz_col1:
+            # Bar chart of top QBs
+            fig_bar = px.bar(
+                filtered_rankings.head(15),
+                x='weighted_rating',
+                y='player_name',
+                orientation='h',
+                labels={'weighted_rating': 'Overall Score', 'player_name': 'Player'},
+                title='Top 15 QBs - Overall Score',
+                color='weighted_rating',
+                color_continuous_scale='RdYlGn'
+            )
+            fig_bar.update_layout(yaxis={'categoryorder': 'total ascending'}, height=500)
+            st.plotly_chart(fig_bar, use_container_width=True)
+        
+        with viz_col2:
+            # Scatter: Recent vs Career performance
+            fig_scatter = px.scatter(
+                filtered_rankings,
+                x='career_rating',
+                y='recent_rating',
+                size='total_attempts',
+                color='weighted_rating',
+                hover_data=['player_name', 'seasons_played', 'archetype'],
+                labels={'career_rating': 'Career Average Rating', 'recent_rating': '2024-25 Average Rating'},
+                title='Recent Performance vs Career Average',
+                color_continuous_scale='RdYlGn'
+            )
+            
+            # Add diagonal line (where recent = career)
+            fig_scatter.add_trace(
+                go.Scatter(
+                    x=[60, 95],
+                    y=[60, 95],
+                    mode='lines',
+                    line=dict(color='gray', dash='dash'),
+                    showlegend=False,
+                    hoverinfo='skip'
+                )
+            )
+            
+            fig_scatter.update_layout(height=500)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+        
+        # Individual QB comparison
+        st.markdown("---")
+        st.subheader("Compare QBs")
+        
+        compare_qbs = st.multiselect(
+            "Select QBs to compare",
+            options=filtered_rankings['player_name'].tolist(),
+            default=filtered_rankings['player_name'].head(3).tolist(),
+            key="compare_qbs"
+        )
+        
+        if compare_qbs:
+            compare_data = filtered_rankings[filtered_rankings['player_name'].isin(compare_qbs)]
+            
+            # Radar chart
+            categories = ['Mobility', 'Accuracy', 'Ball Security', 'Playmaking']
+            
+            fig_radar = go.Figure()
+            
+            for _, qb in compare_data.iterrows():
+                fig_radar.add_trace(go.Scatterpolar(
+                    r=[qb['mobility'], qb['accuracy'], qb['ball_security'], qb['playmaking']],
+                    theta=categories,
+                    fill='toself',
+                    name=qb['player_name']
+                ))
+            
+            fig_radar.update_layout(
+                polar=dict(radialaxis=dict(visible=True, range=[50, 100])),
+                showlegend=True,
+                title='QB Attribute Comparison',
+                height=500
+            )
+            
+            st.plotly_chart(fig_radar, use_container_width=True)
+            
+            # Stats comparison table
+            compare_table = compare_data[[
+                'rank', 'player_name', 'weighted_rating', 'recent_rating', 'career_rating',
+                'seasons_played', 'total_attempts', 'archetype'
+            ]].copy()
+            
+            compare_table.columns = ['Rank', 'Player', 'Overall', '2024-25', 'Career', 'Seasons', 'Att', 'Style']
+            compare_table = compare_table.round(1)
+            
+            st.dataframe(compare_table, use_container_width=True, hide_index=True)
+        
+        # Methodology explanation
+        with st.expander("📊 How Rankings Are Calculated"):
+            st.markdown("""
+            ### Weighted Rating Formula
+            
+            **Overall Score = (Recent Performance × 70%) + (Career Performance × 30%)**
+            
+            **Recent Performance (70% weight)**:
+            - Average rating from 2024-2025 seasons
+            - Reflects current form and abilities
+            
+            **Career Performance (30% weight)**:
+            - Weighted average of all seasons before 2024
+            - Recent years (2021-2023) weighted 70%
+            - Older years (pre-2021) weighted 30%
+            
+            ### Why This Approach?
+            
+            - **Recent performance matters most** - A QB's last two seasons best predict future success
+            - **Career context is important** - Consistent excellence across years vs one-year wonders
+            - **Experience counts** - Battle-tested QBs with proven track records ranked appropriately
+            - **Fair to rookies** - Young players aren't overly penalized for lack of history
+            
+            ### Current Player Definition
+            
+            Players who appeared in the 2024 or 2025 season are considered "current."
+            
+            ### Use Case
+            
+            This ranking answers: **"If I'm building a team today and can choose any QB, who should I pick?"**
+            
+            Perfect for:
+            - GM/Team building decisions
+            - Fantasy draft rankings
+            - Trade value assessments
+            - Understanding QB market value
+            """)
+    
+    except Exception as e:
+        st.error(f"Error calculating current QB rankings: {e}")
+        st.exception(e)
+
+# --- Tab 2: Top 32 QBs Table ---
+with tabs[1]:
     st.header("Top 32 QBs - Custom Ratings & Playstyle Profiles")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", options=all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], format_func=str, key="year_filter_tab0")
@@ -282,8 +577,8 @@ with tabs[0]:
     st.dataframe(styled, use_container_width=True, height=800)
     rating_explanation()
 
-# --- Tab 2: Player Career Ratings Table ---
-with tabs[1]:
+# --- Tab 3: Player Career Ratings Table ---
+with tabs[2]:
     st.header("Player Career Ratings Table")
     player = st.selectbox("Select Player", sorted(df['display_name'].unique()))
     player_df = df[df['display_name'] == player].sort_values('season')
@@ -382,8 +677,8 @@ with tabs[1]:
     else:
         st.info("No data for this player.")
 
-# --- Tab 3: Component Scores Analysis ---
-with tabs[2]:
+# --- Tab 4: Component Scores Analysis ---
+with tabs[3]:
     st.header("Rating Component Scores Analysis")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else [all_years[0]], key="year_filter_tab2")
@@ -452,8 +747,8 @@ with tabs[2]:
     **Higher scores are better** - Each component ranges from 50 (worst) to 100 (best).
     """)
 
-# --- Tab 4: EPA vs CPOE Scatter Plot ---
-with tabs[3]:
+# --- Tab 5: EPA vs CPOE Scatter Plot ---
+with tabs[4]:
     st.header("Total Pass EPA vs CPOE Scatter Plot")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab3")
@@ -533,8 +828,8 @@ with tabs[3]:
     else:
         st.warning("No data available for selected seasons")
 
-# --- Tab 5: Sack Rate vs Yards/Attempt Scatter Plot ---
-with tabs[4]:
+# --- Tab 6: Sack Rate vs Yards/Attempt Scatter Plot ---
+with tabs[5]:
     st.header("Sack Rate vs Yards/Attempt Scatter Plot")
     all_years = sorted(df['season'].unique(), reverse=True)
     selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab5")
@@ -621,8 +916,8 @@ with tabs[4]:
     else:
         st.warning("No data available for selected seasons")
 
-# --- Tab 6: Custom vs ML Composite Comparison ---
-with tabs[5]:
+# --- Tab 7: Custom vs ML Composite Comparison ---
+with tabs[6]:
     st.header("Custom Rating vs ML Composite Rating")
     
     st.markdown("""
@@ -764,8 +1059,8 @@ with tabs[5]:
     else:
         st.warning("No composite rating data available for selected seasons")
 
-# --- Tab 7: Interactive QB Journey Map ---
-with tabs[6]:
+# --- Tab 8: Interactive QB Journey Map ---
+with tabs[7]:
     st.header("🗺️ Interactive QB Journey Map")
     st.markdown("""
     Trace individual QB careers across seasons. Select multiple QBs to compare their rating trajectories,
@@ -961,8 +1256,8 @@ with tabs[6]:
     else:
         st.info("Please select at least one QB to view their journey.")
 
-# --- Tab 8: Contract Value Analysis ---
-with tabs[7]:
+# --- Tab 9: Contract Value Analysis ---
+with tabs[8]:
     st.header("💰 QB Contract Value Analysis")
     st.markdown("""
     Analyze which quarterbacks provide the best value relative to their contracts by comparing 
