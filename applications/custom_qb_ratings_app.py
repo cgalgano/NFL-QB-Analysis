@@ -213,18 +213,18 @@ df, last_refresh = load_data()
 # Header with last updated info
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.title("🏈 Custom NFL QB Rankings (2010-2025)")
+    st.title("Custom NFL QB Rankings (2010-2025)")
 with col2:
     if last_refresh:
         from datetime import datetime
         refresh_dt = datetime.fromisoformat(last_refresh)
-        st.caption(f"📅 Data as of: {refresh_dt.strftime('%Y-%m-%d')}")
+        st.caption(f"Data as of: {refresh_dt.strftime('%Y-%m-%d')}")
 
-tabs = st.tabs(["Best QBs Right Now", "Top 32 QBs & Playstyles", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map", "Contract Value Analysis"])
+tabs = st.tabs(["Best Current QBs", "Top QBs by Year", "Player Career View", "Component Scores Analysis", "EPA vs CPOE Scatter", "Sack Rate vs Y/A Scatter", "Custom vs ML Composite", "Interactive QB Journey Map", "Contract Value Analysis"])
 
-# --- Tab 1: Best QBs Right Now (Current Players Ranked by Weighted Recent + Career Performance) ---
+# --- Tab 1: Best Current QBs (Current Players Ranked by Weighted Recent + Career Performance) ---
 with tabs[0]:
-    st.header("🏆 Best Quarterbacks Right Now")
+    st.header("Best Quarterbacks Right Now")
     st.markdown("**If you had to draft a QB today, who would you pick?**")
     st.markdown("Rankings combine recent performance (2024-2025 heavily weighted) with full career history for current active players.")
     
@@ -382,65 +382,64 @@ with tabs[0]:
         st.markdown("---")
         st.subheader("Rankings Insights")
         
-        viz_col1, viz_col2 = st.columns(2)
+        # Career trajectory: Improving vs Declining (full width)
+        filtered_rankings['trajectory'] = filtered_rankings['recent_rating'] - filtered_rankings['career_rating']
         
-        with viz_col1:
-            # Career trajectory: Improving vs Declining
-            filtered_rankings['trajectory'] = filtered_rankings['recent_rating'] - filtered_rankings['career_rating']
-            
-            fig_trajectory = px.bar(
-                filtered_rankings.head(20).sort_values('trajectory', ascending=True),
-                x='trajectory',
-                y='player_name',
-                orientation='h',
-                labels={'trajectory': 'Rating Change (Recent - Career)', 'player_name': 'Player'},
-                title='🔥 Hot vs ❄️ Cold: Who\'s Improving/Declining?',
-                color='trajectory',
-                color_continuous_scale='RdYlGn',
-                color_continuous_midpoint=0
-            )
-            fig_trajectory.update_layout(
-                yaxis={'categoryorder': 'total ascending'}, 
-                height=500,
-                xaxis_title='Negative = Declining | Positive = Improving'
-            )
-            fig_trajectory.add_vline(x=0, line_dash="dash", line_color="gray")
-            st.plotly_chart(fig_trajectory, use_container_width=True)
-            
-            st.caption("**Green (Right)**: Playing better than career average | **Red (Left)**: Declining from peak")
+        # Prepare data with better hover information
+        trajectory_data = filtered_rankings.head(20).sort_values('trajectory', ascending=True).copy()
+        trajectory_data['hover_text'] = trajectory_data.apply(
+            lambda row: f"<b>{row['player_name']}</b><br>" +
+                       f"Overall Score: {row['weighted_rating']:.1f}<br>" +
+                       f"Recent (2024-25): {row['recent_rating']:.1f}<br>" +
+                       f"Career Average: {row['career_rating']:.1f}<br>" +
+                       f"Change: {row['trajectory']:+.1f}<br>" +
+                       f"Status: {'Improving ↑' if row['trajectory'] > 0 else 'Declining ↓' if row['trajectory'] < 0 else 'Steady →'}",
+            axis=1
+        )
         
-        with viz_col2:
-            # Experience vs Performance
-            fig_exp = px.scatter(
-                filtered_rankings,
-                x='seasons_played',
-                y='weighted_rating',
-                size='total_attempts',
-                color='archetype',
-                hover_data={
-                    'player_name': True,
-                    'seasons_played': ':.0f',
-                    'weighted_rating': ':.1f',
-                    'total_attempts': ':.0f',
-                    'recent_rating': ':.1f',
-                    'career_rating': ':.1f',
-                    'archetype': True
-                },
-                labels={
-                    'seasons_played': 'Seasons Played',
-                    'weighted_rating': 'Overall Score',
-                    'player_name': 'Player',
-                    'total_attempts': 'Total Attempts',
-                    'recent_rating': '2024-25 Rating',
-                    'career_rating': 'Career Rating',
-                    'archetype': 'Playstyle'
-                },
-                title='⏱️ Experience vs Performance',
+        fig_trajectory = go.Figure()
+        
+        fig_trajectory.add_trace(go.Bar(
+            x=trajectory_data['trajectory'],
+            y=trajectory_data['player_name'],
+            orientation='h',
+            marker=dict(
+                color=trajectory_data['trajectory'],
+                colorscale='RdYlGn',
+                cmid=0,
+                line=dict(color='rgba(0,0,0,0.2)', width=1)
+            ),
+            text=trajectory_data['trajectory'].apply(lambda x: f"{x:+.1f}"),
+            textposition='outside',
+            hovertext=trajectory_data['hover_text'],
+            hoverinfo='text'
+        ))
+        
+        fig_trajectory.update_layout(
+            title='Hot vs Cold: Who is Improving or Declining?',
+            xaxis_title='Rating Change (Recent Performance - Career Average)',
+            yaxis_title='',
+            yaxis={'categoryorder': 'total ascending'},
+            height=700,
+            showlegend=False,
+            hovermode='closest',
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=13,
+                font_family="Arial"
             )
-            fig_exp.update_layout(height=500, showlegend=True)
-            st.plotly_chart(fig_exp, use_container_width=True)
-            
-            st.caption("**Bubble size** = Career attempts | **Top-right** = Elite veterans | **Top-left** = Elite young players")
+        )
+        fig_trajectory.add_vline(x=0, line_dash="dash", line_color="gray", line_width=2)
+        fig_trajectory.add_annotation(
+            x=0, y=1.05, yref='paper',
+            text='Baseline (Career Average)',
+            showarrow=False,
+            font=dict(size=11, color='gray')
+        )
+        
+        st.plotly_chart(fig_trajectory, use_container_width=True)
+        
+        st.caption("**Green (Right)**: Playing better than career average | **Red (Left)**: Declining from peak | **Hover for details**")
         
         # New row: Attribute hexbin and Prime years analysis
         viz_col3, viz_col4 = st.columns(2)
@@ -454,7 +453,7 @@ with tabs[0]:
             fig_heat = px.imshow(
                 heatmap_data.T,
                 labels=dict(x="Player", y="Attribute", color="Rating"),
-                title="🎯 Top 15 QBs - Attribute Strengths",
+                title="Top 15 QBs - Attribute Strengths",
                 color_continuous_scale='RdYlGn',
                 aspect="auto"
             )
@@ -488,7 +487,7 @@ with tabs[0]:
                     'weighted_rating': 'Overall Score',
                     'player_name': 'Player'
                 },
-                title='📊 Performance by Career Stage',
+                title='Performance by Career Stage',
                 color_discrete_map={
                     'Rookie/2nd Year': '#3498db',
                     'Prime Years (3-10)': '#2ecc71',
