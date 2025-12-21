@@ -93,7 +93,9 @@ season_agg AS (
         
         -- VOLUME STATS (per game)
         SUM(rush_attempt) AS rush_attempts,
+        SUM(rushing_yards) AS total_rush_yards,
         SUM(rushing_yards) / CAST(COUNT(DISTINCT game_id) AS FLOAT) AS rush_yards_per_game,
+        SUM(passing_yards) AS total_pass_yards,
         SUM(passing_yards) / CAST(COUNT(DISTINCT game_id) AS FLOAT) AS pass_yards_per_game,
         (SUM(pass_touchdown) + SUM(rush_touchdown)) / CAST(COUNT(DISTINCT game_id) AS FLOAT) AS total_tds_per_game,
         
@@ -148,7 +150,9 @@ SELECT
     
     -- Volume stats (per game)
     COALESCE(s.rush_attempts, 0) AS rush_attempts,
+    COALESCE(s.total_rush_yards, 0) AS total_rush_yards,
     COALESCE(s.rush_yards_per_game, 0) AS rush_yards_per_game,
+    COALESCE(s.total_pass_yards, 0) AS total_pass_yards,
     COALESCE(s.pass_yards_per_game, 0) AS pass_yards_per_game,
     COALESCE(s.total_tds_per_game, 0) AS total_tds_per_game,
     
