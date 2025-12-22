@@ -1533,25 +1533,6 @@ with tabs[8]:
             - **Severely Overpaid** (<-10 pts): Significantly underperforming for their contract
             
             This approach is intuitive: you can directly see if a QB is performing better or worse than their contract suggests they should.
-            """)update_layout(showlegend=False, height=400)
-        st.plotly_chart(fig_bar, use_container_width=True)
-        
-        # Explanation
-        with st.expander("ℹ️ How Value Score is Calculated"):
-            st.markdown("""
-            **Value Score = Custom Rating - Salary Percentile**
-            
-            - **Positive score**: QB is outperforming their contract (good value)
-            - **Negative score**: QB is underperforming their contract (overpaid)
-            
-            **Value Categories**:
-            - **Excellent Value** (>+20): Elite performance on budget-friendly contract
-            - **Good Value** (+10 to +20): Above-average value
-            - **Fair Value** (-10 to +10): Performance matches contract
-            - **Overpaid** (-20 to -10): Below-average value
-            - **Severely Overpaid** (<-20): Poor performance on expensive contract
-            
-            **Note**: Salary percentile is calculated within each season (0-100 scale).
             """)
     
     except Exception as e:
