@@ -392,45 +392,69 @@ with tabs[0]:
         
         fig_trajectory = go.Figure()
         
-        # Add range lines (career to recent)
+        # Add arrows from career average to recent performance
         for idx, row in trajectory_data.iterrows():
-            color = 'green' if row['trajectory'] >= 0 else 'red'
+            color = 'rgba(34, 139, 34, 0.6)' if row['trajectory'] >= 0 else 'rgba(220, 20, 60, 0.6)'
+            arrow_color = 'green' if row['trajectory'] >= 0 else 'red'
+            
+            # Add line
             fig_trajectory.add_trace(go.Scatter(
                 x=[row['career_rating'], row['recent_rating']],
                 y=[row['player_name'], row['player_name']],
                 mode='lines',
-                line=dict(color=color, width=2),
+                line=dict(color=color, width=3),
                 showlegend=False,
                 hoverinfo='skip'
             ))
+            
+            # Add arrow annotation
+            fig_trajectory.add_annotation(
+                x=row['recent_rating'],
+                y=row['player_name'],
+                ax=row['career_rating'],
+                ay=row['player_name'],
+                xref='x',
+                yref='y',
+                axref='x',
+                ayref='y',
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1.5,
+                arrowwidth=2,
+                arrowcolor=arrow_color,
+                opacity=0.8
+            )
         
-        # Add career average dots
+        # Add career average markers (starting point)
         fig_trajectory.add_trace(go.Scatter(
             x=trajectory_data['career_rating'],
             y=trajectory_data['player_name'],
-            mode='markers',
-            marker=dict(size=8, color='gray', symbol='circle'),
-            name='Career Avg',
+            mode='markers+text',
+            marker=dict(size=12, color='gray', symbol='circle', line=dict(width=2, color='black')),
+            text=['START'] * len(trajectory_data),
+            textposition='middle center',
+            textfont=dict(size=7, color='white', family='Arial Black'),
+            name='Career Avg (Start)',
             hovertemplate='<b>%{y}</b><br>Career Average: %{x:.1f}<extra></extra>'
         ))
         
-        # Add recent performance dots
-        trajectory_data['status'] = trajectory_data['trajectory'].apply(
-            lambda x: 'Improving ↑' if x > 0 else 'Declining ↓' if x < 0 else 'Steady →'
-        )
-        
+        # Add recent performance markers (ending point)
         fig_trajectory.add_trace(go.Scatter(
             x=trajectory_data['recent_rating'],
             y=trajectory_data['player_name'],
-            mode='markers',
+            mode='markers+text',
             marker=dict(
-                size=10, 
+                size=14, 
                 color=trajectory_data['trajectory'],
                 colorscale='RdYlGn',
                 cmid=0,
                 symbol='circle',
-                line=dict(width=1, color='DarkSlateGrey')
+                line=dict(width=2, color='black'),
+                colorbar=dict(title="Change", x=1.15)
             ),
+            text=['NOW'] * len(trajectory_data),
+            textposition='middle center',
+            textfont=dict(size=7, color='white', family='Arial Black'),
             name='Recent (2024-25)',
             hovertemplate='<b>%{y}</b><br>' +
                          'Recent Rating: %{x:.1f}<br>' +
@@ -442,8 +466,8 @@ with tabs[0]:
         ))
         
         fig_trajectory.update_layout(
-            title='Recent Form vs Career Average (Top 20 QBs)',
-            xaxis_title='Rating',
+            title='Recent Form vs Career Average (Top 20 QBs) - Arrow Shows Direction',
+            xaxis_title='Rating (50-100 Scale)',
             yaxis_title='',
             height=700,
             hovermode='closest',
@@ -453,12 +477,14 @@ with tabs[0]:
                 y=1.02,
                 xanchor="right",
                 x=1
-            )
+            ),
+            xaxis=dict(range=[trajectory_data[['career_rating', 'recent_rating']].min().min() - 2,
+                             trajectory_data[['career_rating', 'recent_rating']].max().max() + 2])
         )
         
         st.plotly_chart(fig_trajectory, use_container_width=True)
         
-        st.caption("**Gray dot** = Career average | **Colored dot** = Recent (2024-25) | **Green line** = Improving | **Red line** = Declining")
+        st.caption("**START (gray)** = Career average | **NOW (colored)** = Recent (2024-25) | **Arrow direction** = Trajectory (Green = improving, Red = declining)")
         
         # New row: Attribute hexbin and Prime years analysis
         viz_col3, viz_col4 = st.columns(2)
