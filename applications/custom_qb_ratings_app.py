@@ -384,64 +384,81 @@ with tabs[0]:
         st.markdown("---")
         st.subheader("Rankings Insights")
         
-        # Career trajectory: Improving vs Declining (full width)
+        # Career trajectory: Recent vs Career Average with range visualization
         filtered_rankings['trajectory'] = filtered_rankings['recent_rating'] - filtered_rankings['career_rating']
         
-        # Prepare data with better hover information
-        trajectory_data = filtered_rankings.head(20).sort_values('weighted_rating', ascending=False).copy()
-        trajectory_data['hover_text'] = trajectory_data.apply(
-            lambda row: f"<b>{row['player_name']}</b><br>" +
-                       f"Overall Score: {row['weighted_rating']:.1f}<br>" +
-                       f"Recent (2024-25): {row['recent_rating']:.1f}<br>" +
-                       f"Career Average: {row['career_rating']:.1f}<br>" +
-                       f"Change: {row['trajectory']:+.1f}<br>" +
-                       f"Status: {'Improving ↑' if row['trajectory'] > 0 else 'Declining ↓' if row['trajectory'] < 0 else 'Steady →'}",
-            axis=1
-        )
+        # Prepare data - top 20 by ranking
+        trajectory_data = filtered_rankings.head(20).sort_values('weighted_rating', ascending=True).copy()
         
         fig_trajectory = go.Figure()
         
-        fig_trajectory.add_trace(go.Bar(
-            x=trajectory_data['trajectory'],
+        # Add range lines (career to recent)
+        for idx, row in trajectory_data.iterrows():
+            color = 'green' if row['trajectory'] >= 0 else 'red'
+            fig_trajectory.add_trace(go.Scatter(
+                x=[row['career_rating'], row['recent_rating']],
+                y=[row['player_name'], row['player_name']],
+                mode='lines',
+                line=dict(color=color, width=2),
+                showlegend=False,
+                hoverinfo='skip'
+            ))
+        
+        # Add career average dots
+        fig_trajectory.add_trace(go.Scatter(
+            x=trajectory_data['career_rating'],
             y=trajectory_data['player_name'],
-            orientation='h',
+            mode='markers',
+            marker=dict(size=8, color='gray', symbol='circle'),
+            name='Career Avg',
+            hovertemplate='<b>%{y}</b><br>Career Average: %{x:.1f}<extra></extra>'
+        ))
+        
+        # Add recent performance dots
+        trajectory_data['status'] = trajectory_data['trajectory'].apply(
+            lambda x: 'Improving ↑' if x > 0 else 'Declining ↓' if x < 0 else 'Steady →'
+        )
+        
+        fig_trajectory.add_trace(go.Scatter(
+            x=trajectory_data['recent_rating'],
+            y=trajectory_data['player_name'],
+            mode='markers',
             marker=dict(
+                size=10, 
                 color=trajectory_data['trajectory'],
                 colorscale='RdYlGn',
                 cmid=0,
-                line=dict(color='rgba(0,0,0,0.2)', width=1)
+                symbol='circle',
+                line=dict(width=1, color='DarkSlateGrey')
             ),
-            text=trajectory_data['trajectory'].apply(lambda x: f"{x:+.1f}"),
-            textposition='outside',
-            hovertext=trajectory_data['hover_text'],
-            hoverinfo='text'
+            name='Recent (2024-25)',
+            hovertemplate='<b>%{y}</b><br>' +
+                         'Recent Rating: %{x:.1f}<br>' +
+                         'Career Avg: ' + trajectory_data['career_rating'].apply(lambda x: f'{x:.1f}').astype(str) + '<br>' +
+                         'Change: ' + trajectory_data['trajectory'].apply(lambda x: f'{x:+.1f}').astype(str) + '<br>' +
+                         'Overall Score: ' + trajectory_data['weighted_rating'].apply(lambda x: f'{x:.1f}').astype(str) +
+                         '<extra></extra>',
+            customdata=trajectory_data[['career_rating', 'trajectory', 'weighted_rating']]
         ))
         
         fig_trajectory.update_layout(
             title='Recent Form vs Career Average (Top 20 QBs)',
-            xaxis_title='Rating Change (Recent Performance - Career Average)',
+            xaxis_title='Rating',
             yaxis_title='',
-            yaxis={'categoryorder': 'array', 'categoryarray': trajectory_data['player_name'].tolist()},
             height=700,
-            showlegend=False,
             hovermode='closest',
-            hoverlabel=dict(
-                bgcolor="white",
-                font_size=13,
-                font_family="Arial"
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
             )
-        )
-        fig_trajectory.add_vline(x=0, line_dash="dash", line_color="gray", line_width=2)
-        fig_trajectory.add_annotation(
-            x=0, y=1.05, yref='paper',
-            text='Baseline (Career Average)',
-            showarrow=False,
-            font=dict(size=11, color='gray')
         )
         
         st.plotly_chart(fig_trajectory, use_container_width=True)
         
-        st.caption("**Green (Right)**: Playing better than career average | **Red (Left)**: Declining from peak | **Sorted by overall ranking**")
+        st.caption("**Gray dot** = Career average | **Colored dot** = Recent (2024-25) | **Green line** = Improving | **Red line** = Declining")
         
         # New row: Attribute hexbin and Prime years analysis
         viz_col3, viz_col4 = st.columns(2)
