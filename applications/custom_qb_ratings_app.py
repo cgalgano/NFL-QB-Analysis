@@ -408,21 +408,20 @@ with tabs[0]:
             ))
             
             # Calculate arrow position to not overlap with dots
-            # Arrow should stop before reaching the large dot
             arrow_start_x = row['career_rating']
             arrow_end_x = row['recent_rating']
             distance = arrow_end_x - arrow_start_x
-            # Stop arrow 0.5 units before the end dot
+            # Stop arrow 0.2 units before the end dot
             if distance != 0:
-                arrow_end_adjusted = arrow_end_x - (0.5 if distance > 0 else -0.5)
+                arrow_end_adjusted = arrow_end_x - (0.2 if distance > 0 else -0.2)
             else:
                 arrow_end_adjusted = arrow_end_x
             
-            # Add arrow annotation
+            # Add arrow annotation (no line, just arrowhead)
             fig_trajectory.add_annotation(
                 x=arrow_end_adjusted,
                 y=row['player_name'],
-                ax=arrow_start_x,
+                ax=arrow_end_adjusted - (0.01 if distance > 0 else -0.01),
                 ay=row['player_name'],
                 xref='x',
                 yref='y',
@@ -433,7 +432,8 @@ with tabs[0]:
                 arrowsize=1.2,
                 arrowwidth=2,
                 arrowcolor=arrow_color,
-                opacity=0.8
+                opacity=0.8,
+                standoff=0
             )
         
         # Add career average markers (small starting point)
