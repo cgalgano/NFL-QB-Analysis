@@ -228,6 +228,8 @@ with tabs[0]:
     st.markdown("**If you had to draft a QB today, who would you pick?**")
     st.markdown("Rankings combine recent performance (2024-2025 heavily weighted) with full career history for current active players.")
     
+    st.info("ℹ️ **Rating Scale:** All ratings are normalized across 2010-2025 (15 years) on a 50-100 scale. **100 = highest value**, 50 = lowest.")
+    
     try:
         # Define current players as those who played in 2024 or 2025
         current_seasons = [2024, 2025]
