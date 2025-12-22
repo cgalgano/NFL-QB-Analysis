@@ -397,21 +397,32 @@ with tabs[0]:
             color = 'rgba(34, 139, 34, 0.6)' if row['trajectory'] >= 0 else 'rgba(220, 20, 60, 0.6)'
             arrow_color = 'green' if row['trajectory'] >= 0 else 'red'
             
-            # Add line
+            # Add dotted line
             fig_trajectory.add_trace(go.Scatter(
                 x=[row['career_rating'], row['recent_rating']],
                 y=[row['player_name'], row['player_name']],
                 mode='lines',
-                line=dict(color=color, width=3),
+                line=dict(color=color, width=2, dash='dot'),
                 showlegend=False,
                 hoverinfo='skip'
             ))
             
+            # Calculate arrow position to not overlap with dots
+            # Arrow should stop before reaching the large dot
+            arrow_start_x = row['career_rating']
+            arrow_end_x = row['recent_rating']
+            distance = arrow_end_x - arrow_start_x
+            # Stop arrow 0.5 units before the end dot
+            if distance != 0:
+                arrow_end_adjusted = arrow_end_x - (0.5 if distance > 0 else -0.5)
+            else:
+                arrow_end_adjusted = arrow_end_x
+            
             # Add arrow annotation
             fig_trajectory.add_annotation(
-                x=row['recent_rating'],
+                x=arrow_end_adjusted,
                 y=row['player_name'],
-                ax=row['career_rating'],
+                ax=arrow_start_x,
                 ay=row['player_name'],
                 xref='x',
                 yref='y',
@@ -419,7 +430,7 @@ with tabs[0]:
                 ayref='y',
                 showarrow=True,
                 arrowhead=2,
-                arrowsize=1.5,
+                arrowsize=1.2,
                 arrowwidth=2,
                 arrowcolor=arrow_color,
                 opacity=0.8
