@@ -1334,8 +1334,8 @@ with tabs[7]:
 with tabs[8]:
     st.header("💰 QB Contract Value Analysis")
     st.markdown("""
-    Analyze which quarterbacks provide the best value relative to their contracts by comparing 
-    performance ratings against salary percentiles within each season.
+    Compare QB performance against what their salary suggests they should deliver. QBs performing above 
+    their expected rating provide **good value**, while those below are **overpaid**.
     """)
     
     try:
@@ -1361,11 +1361,12 @@ with tabs[8]:
             avg_salary = year_data['salary_millions'].mean()
             st.metric("Avg Salary", f"${avg_salary:.1f}M")
         with col3:
-            avg_rating = year_data['custom_rating'].mean()
-            st.metric("Avg Rating", f"{avg_rating:.1f}")
+            avg_outperform = year_data['value_over_expected'].mean()
+            st.metric("Avg Value", f"{avg_outperform:+.1f} pts", 
+                     delta_color="normal" if avg_outperform > 0 else "inverse")
         with col4:
-            excellent_value_count = len(year_data[year_data['value_category'] == 'Excellent Value'])
-            st.metric("Excellent Value QBs", excellent_value_count)
+            elite_value_count = len(year_data[year_data['value_category'] == 'Elite Value'])
+            st.metric("Elite Value QBs", elite_value_count)
         
         st.markdown("---")
         
@@ -1373,54 +1374,58 @@ with tabs[8]:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("🟢 Best Contract Value")
-            best_value = year_data.nlargest(10, 'value_score')[[
-                'player_name', 'team', 'custom_rating', 'salary_millions', 'value_score', 'value_category'
+            st.subheader("🟢 Best Contract Value (Outperforming)")
+            best_value = year_data.nlargest(10, 'value_over_expected')[[
+                'player_name', 'team', 'actual_rating', 'expected_rating', 'salary_millions', 'value_over_expected', 'value_pct'
             ]].reset_index(drop=True)
             best_value.index = best_value.index + 1
-            best_value.columns = ['Player', 'Team', 'Rating', 'Salary ($M)', 'Value Score', 'Category']
+            best_value.columns = ['Player', 'Team', 'Actual', 'Expected', 'Salary ($M)', 'Difference', '% Better']
             
             # Color code the dataframe
             def highlight_best(row):
-                if row['Value Score'] > 20:
+                if row['Difference'] > 10:
                     return ['background-color: #d4edda'] * len(row)
-                elif row['Value Score'] > 10:
+                elif row['Difference'] > 5:
                     return ['background-color: #d1ecf1'] * len(row)
                 else:
                     return [''] * len(row)
             
             st.dataframe(
                 best_value.style.apply(highlight_best, axis=1).format({
-                    'Rating': '{:.1f}',
-                    'Salary ($M)': '${:.2f}M',
-                    'Value Score': '{:+.1f}'
+                    'Actual': '{:.1f}',
+                    'Expected': '{:.1f}',
+                    'Salary ($M)': '${:.1f}M',
+                    'Difference': '{:+.1f}',
+                    '% Better': '{:+.1f}%'
                 }),
                 use_container_width=True,
                 height=400
             )
         
         with col2:
-            st.subheader("🔴 Worst Contract Value")
-            worst_value = year_data.nsmallest(10, 'value_score')[[
-                'player_name', 'team', 'custom_rating', 'salary_millions', 'value_score', 'value_category'
+            st.subheader("🔴 Worst Contract Value (Underperforming)")
+            worst_value = year_data.nsmallest(10, 'value_over_expected')[[
+                'player_name', 'team', 'actual_rating', 'expected_rating', 'salary_millions', 'value_over_expected', 'value_pct'
             ]].reset_index(drop=True)
             worst_value.index = worst_value.index + 1
-            worst_value.columns = ['Player', 'Team', 'Rating', 'Salary ($M)', 'Value Score', 'Category']
+            worst_value.columns = ['Player', 'Team', 'Actual', 'Expected', 'Salary ($M)', 'Difference', '% Worse']
             
             # Color code the dataframe
             def highlight_worst(row):
-                if row['Value Score'] < -20:
+                if row['Difference'] < -10:
                     return ['background-color: #f8d7da'] * len(row)
-                elif row['Value Score'] < -10:
+                elif row['Difference'] < -5:
                     return ['background-color: #fff3cd'] * len(row)
                 else:
                     return [''] * len(row)
             
             st.dataframe(
                 worst_value.style.apply(highlight_worst, axis=1).format({
-                    'Rating': '{:.1f}',
-                    'Salary ($M)': '${:.2f}M',
-                    'Value Score': '{:+.1f}'
+                    'Actual': '{:.1f}',
+                    'Expected': '{:.1f}',
+                    'Salary ($M)': '${:.1f}M',
+                    'Difference': '{:+.1f}',
+                    '% Worse': '{:+.1f}%'
                 }),
                 use_container_width=True,
                 height=400
@@ -1428,48 +1433,48 @@ with tabs[8]:
         
         st.markdown("---")
         
-        # Scatter plot: Rating vs Salary
-        st.subheader("QB Performance vs. Salary")
+        # Scatter plot: Actual vs Expected Rating
+        st.subheader("Actual vs Expected Performance")
         
-        fig = px.scatter(
-            year_data,
-            x='salary_millions',
-            y='custom_rating',
-            color='value_score',
-            color_continuous_scale='RdYlGn',
-            hover_data=['player_name', 'team', 'value_category'],
-            labels={
-                'salary_millions': 'Salary (Millions)',
-                'custom_rating': 'Custom QB Rating',
-                'value_score': 'Value Score'
-            },
-            title=f'{selected_year} Season - QB Rating vs Salary'
-        )
+        # Add diagonal line data for "fair value"
+        min_rating = year_data[['actual_rating', 'expected_rating']].min().min()
+        max_rating = year_data[['actual_rating', 'expected_rating']].max().max()
         
-        fig.update_traces(
-            marker=dict(size=12, line=dict(width=1, color='DarkSlateGrey')),
-            hovertemplate='<b>%{customdata[0]}</b><br>' +
-                          'Team: %{customdata[1]}<br>' +
-                          'Rating: %{y:.1f}<br>' +
-                          'Salary: $%{x:.1f}M<br>' +
-                          'Value: %{customdata[2]}<br>' +
-                          '<extra></extra>'
-        )
+        fig = go.Figure()
         
-        fig.update_layout(
-            height=500,
-            coloraxis_colorbar=dict(
-                title="Value Score<br>(Green=Good, Red=Overpaid)"
-            )
-        )
+        # Add diagonal "fair value" line
+        fig.add_trace(go.Scatter(
+            x=[min_rating, max_rating],
+            y=[min_rating, max_rating],
+            mode='lines',
+            name='Fair Value',
+            line=dict(color='gray', dash='dash', width=2),
+            hoverinfo='skip'
+        ))
         
-        st.plotly_chart(fig, use_container_width=True)
-        
+        # Add QB data points
+        fig.add_trace(go.Scatter(
+            x=year_data['expected_rating'],
+            y=year_data['actual_rating'],
+            mode='markers',
+            name='QBs',
+            marker=dict(
+                size=12,
+                color=year_data['value_over_expected'],
+                colorscale='RdYlGn',
+                colorbar=dict(title="Value<br>Over<br>Expected"),
+                line=dict(width=1, color='DarkSlateGrey'),
+                cmin=-15,
+                cmax=15
+            ),
+            text=year_data['player_name'],
+            customdata=year_data[['team', 'salary_millions', 'value_over_expected', 'value_pct']],
+            hovertemplate='<b>%{text}</b><br>' +
         # Value category breakdown
         st.markdown("---")
         st.subheader("Value Category Distribution")
         
-        category_order = ['Excellent Value', 'Good Value', 'Fair Value', 'Overpaid', 'Severely Overpaid']
+        category_order = ['Elite Value', 'Good Value', 'Fair Value', 'Overpaid', 'Severely Overpaid']
         category_counts = year_data['value_category'].value_counts().reindex(category_order, fill_value=0)
         
         fig_bar = px.bar(
@@ -1478,7 +1483,7 @@ with tabs[8]:
             labels={'x': 'Value Category', 'y': 'Number of QBs'},
             color=category_counts.index,
             color_discrete_map={
-                'Excellent Value': '#2ecc71',
+                'Elite Value': '#2ecc71',
                 'Good Value': '#27ae60',
                 'Fair Value': '#f39c12',
                 'Overpaid': '#e74c3c',
@@ -1487,6 +1492,30 @@ with tabs[8]:
         )
         
         fig_bar.update_layout(showlegend=False, height=400)
+        st.plotly_chart(fig_bar, use_container_width=True)
+        
+        # Explanation
+        with st.expander("ℹ️ How Contract Value is Calculated"):
+            st.markdown("""
+            **Expected Rating Approach:**
+            
+            1. For each season, we calculate what rating a QB *should* have based on their salary
+            2. Higher paid QBs are expected to perform better (linear relationship within each season)
+            3. **Value Over Expected = Actual Rating - Expected Rating**
+            
+            **Examples:**
+            - QB paid $55M should perform at 85 → actually performs at 75 → **-10 (Overpaid)**
+            - QB paid $5M should perform at 65 → actually performs at 80 → **+15 (Elite Value)**
+            
+            **Value Categories:**
+            - **Elite Value** (>+10 pts): Performing 10+ rating points above expectation
+            - **Good Value** (+5 to +10 pts): Solid performance above salary level
+            - **Fair Value** (-5 to +5 pts): Performing as expected for their salary
+            - **Overpaid** (-10 to -5 pts): Underperforming relative to salary
+            - **Severely Overpaid** (<-10 pts): Significantly underperforming for their contract
+            
+            This approach is intuitive: you can directly see if a QB is performing better or worse than their contract suggests they should.
+            """)update_layout(showlegend=False, height=400)
         st.plotly_chart(fig_bar, use_container_width=True)
         
         # Explanation

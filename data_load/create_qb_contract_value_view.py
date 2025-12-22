@@ -5,6 +5,7 @@ Combines QB season stats with contract data to analyze value vs performance.
 
 import sqlite3
 import pandas as pd
+import os
 
 db_path = 'c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db'
 ratings_csv_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/custom_qb_ratings.csv'
@@ -80,7 +81,32 @@ qb_ratings AS (
     FROM temp_qb_ratings
 ),
 
--- Merge contracts with performance (use pre-calculated ratings)
+-- Calculate expected rating based on salary (linear regression per season)
+salary_to_rating AS (
+    SELECT 
+        s.player_id,
+        s.season,
+        c.apy,
+        r.custom_rating,
+        -- Calculate average rating and salary for the season
+        AVG(r.custom_rating) OVER (PARTITION BY s.season) AS avg_rating,
+        AVG(c.apy) OVER (PARTITION BY s.season) AS avg_salary,
+        -- Min and max for normalization
+        MIN(c.apy) OVER (PARTITION BY s.season) AS min_salary,
+        MAX(c.apy) OVER (PARTITION BY s.season) AS max_salary,
+        MIN(r.custom_rating) OVER (PARTITION BY s.season) AS min_rating,
+        MAX(r.custom_rating) OVER (PARTITION BY s.season) AS max_rating
+    FROM qb_stats s
+    INNER JOIN contract_years c
+        ON s.player_id = c.player_id 
+        AND s.season = c.season
+    INNER JOIN qb_ratings r
+        ON s.player_id = r.player_id
+        AND s.season = r.season
+    WHERE c.apy > 0
+),
+
+-- Merge contracts with performance and calculate expected rating
 qb_value_base AS (
     SELECT 
         s.player_name,
@@ -95,8 +121,11 @@ qb_value_base AS (
         c.year_signed,
         c.contract_length,
         
-        -- Calculate salary percentile within season
-        100.0 * PERCENT_RANK() OVER (PARTITION BY s.season ORDER BY c.apy) AS salary_percentile,
+        -- Calculate expected rating based on salary percentile within season
+        -- Maps salary position to expected rating range
+        str.min_rating + 
+            ((c.apy - str.min_salary) / NULLIF(str.max_salary - str.min_salary, 0)) * 
+            (str.max_rating - str.min_rating) AS expected_rating,
         
         -- Performance metrics
         s.total_pass_epa,
@@ -114,7 +143,10 @@ qb_value_base AS (
     INNER JOIN qb_ratings r
         ON s.player_id = r.player_id
         AND s.season = r.season
-    WHERE c.apy > 0  -- Filter out rookie contracts and missing data
+    INNER JOIN salary_to_rating str
+        ON s.player_id = str.player_id
+        AND s.season = str.season
+    WHERE c.apy > 0
 )
 
 -- Final view with value calculations
@@ -124,21 +156,21 @@ SELECT
     season,
     contract_team AS team,
     attempts,
-    custom_rating,
+    custom_rating AS actual_rating,
+    ROUND(expected_rating, 1) AS expected_rating,
     salary,
     ROUND(salary, 2) AS salary_millions,
-    ROUND(salary_percentile, 1) AS salary_percentile,
     
-    -- Value Score: Rating minus Salary Percentile
-    -- Positive = good value, Negative = overpaid
-    ROUND(custom_rating - salary_percentile, 1) AS value_score,
+    -- Value metrics: Actual vs Expected
+    ROUND(custom_rating - expected_rating, 1) AS value_over_expected,
+    ROUND(((custom_rating - expected_rating) / NULLIF(expected_rating, 0)) * 100, 1) AS value_pct,
     
-    -- Value Category
+    -- Value Category based on difference from expected
     CASE 
-        WHEN (custom_rating - salary_percentile) > 20 THEN 'Excellent Value'
-        WHEN (custom_rating - salary_percentile) > 10 THEN 'Good Value'
-        WHEN (custom_rating - salary_percentile) > -10 THEN 'Fair Value'
-        WHEN (custom_rating - salary_percentile) > -20 THEN 'Overpaid'
+        WHEN (custom_rating - expected_rating) > 10 THEN 'Elite Value'
+        WHEN (custom_rating - expected_rating) > 5 THEN 'Good Value'
+        WHEN (custom_rating - expected_rating) > -5 THEN 'Fair Value'
+        WHEN (custom_rating - expected_rating) > -10 THEN 'Overpaid'
         ELSE 'Severely Overpaid'
     END AS value_category,
     
@@ -161,7 +193,7 @@ SELECT
     contract_length
 
 FROM qb_value_base
-ORDER BY custom_rating DESC;
+ORDER BY value_over_expected DESC;
 """
 
 print("="*80)
@@ -208,18 +240,19 @@ sample_query = """
 SELECT 
     player_name,
     season,
-    ROUND(custom_rating, 1) as rating,
+    ROUND(actual_rating, 1) as rating,
+    ROUND(expected_rating, 1) as expected,
     ROUND(salary / 1000000.0, 1) as salary_m,
-    value_score,
+    value_over_expected,
     value_category
 FROM qb_contract_value
-ORDER BY custom_rating DESC
+ORDER BY value_over_expected DESC
 LIMIT 5
 """
 
 cursor.execute(sample_query)
 for row in cursor.fetchall():
-    print(f"{row[0]:20s} ({row[1]}) - Rating: {row[2]:5.1f}, Salary: ${row[3]:6.1f}M, Value: {row[4]:+6.1f} ({row[5]})")
+    print(f"{row[0]:20s} ({row[1]}) - Actual: {row[2]:5.1f}, Expected: {row[3]:5.1f}, Salary: ${row[4]:6.1f}M, Value: {row[5]:+6.1f} ({row[6]})")
 
 print("\n" + "="*80)
 print("SAMPLE DATA - Worst Value (Bottom 5)")
@@ -229,18 +262,30 @@ sample_query_worst = """
 SELECT 
     player_name,
     season,
-    ROUND(custom_rating, 1) as rating,
+    ROUND(actual_rating, 1) as rating,
+    ROUND(expected_rating, 1) as expected,
     ROUND(salary / 1000000.0, 1) as salary_m,
-    value_score,
+    value_over_expected,
     value_category
 FROM qb_contract_value
-ORDER BY custom_rating DESC, value_score ASC
+ORDER BY value_over_expected ASC
 LIMIT 5
 """
 
 cursor.execute(sample_query_worst)
 for row in cursor.fetchall():
-    print(f"{row[0]:20s} ({row[1]}) - Rating: {row[2]:5.1f}, Salary: ${row[3]:6.1f}M, Value: {row[4]:+6.1f} ({row[5]})")
+    print(f"{row[0]:20s} ({row[1]}) - Actual: {row[2]:5.1f}, Expected: {row[3]:5.1f}, Salary: ${row[4]:6.1f}M, Value: {row[5]:+6.1f} ({row[6]})")
+
+# Export to CSV
+print("\n" + "="*80)
+print("EXPORTING TO CSV")
+print("="*80)
+
+export_query = "SELECT * FROM qb_contract_value"
+export_df = pd.read_sql_query(export_query, conn)
+output_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/qb_contract_value.csv'
+export_df.to_csv(output_path, index=False)
+print(f"Exported {len(export_df)} records to {output_path}")
 
 conn.close()
 
