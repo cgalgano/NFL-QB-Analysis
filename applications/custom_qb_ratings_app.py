@@ -388,7 +388,7 @@ with tabs[0]:
         filtered_rankings['trajectory'] = filtered_rankings['recent_rating'] - filtered_rankings['career_rating']
         
         # Prepare data with better hover information
-        trajectory_data = filtered_rankings.head(20).sort_values('trajectory', ascending=True).copy()
+        trajectory_data = filtered_rankings.head(20).sort_values('weighted_rating', ascending=False).copy()
         trajectory_data['hover_text'] = trajectory_data.apply(
             lambda row: f"<b>{row['player_name']}</b><br>" +
                        f"Overall Score: {row['weighted_rating']:.1f}<br>" +
@@ -418,10 +418,10 @@ with tabs[0]:
         ))
         
         fig_trajectory.update_layout(
-            title='Hot vs Cold: Who is Improving or Declining?',
+            title='Recent Form vs Career Average (Top 20 QBs)',
             xaxis_title='Rating Change (Recent Performance - Career Average)',
             yaxis_title='',
-            yaxis={'categoryorder': 'total ascending'},
+            yaxis={'categoryorder': 'array', 'categoryarray': trajectory_data['player_name'].tolist()},
             height=700,
             showlegend=False,
             hovermode='closest',
@@ -441,7 +441,7 @@ with tabs[0]:
         
         st.plotly_chart(fig_trajectory, use_container_width=True)
         
-        st.caption("**Green (Right)**: Playing better than career average | **Red (Left)**: Declining from peak | **Hover for details**")
+        st.caption("**Green (Right)**: Playing better than career average | **Red (Left)**: Declining from peak | **Sorted by overall ranking**")
         
         # New row: Attribute hexbin and Prime years analysis
         viz_col3, viz_col4 = st.columns(2)
