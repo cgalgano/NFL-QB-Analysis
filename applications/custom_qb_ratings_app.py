@@ -1470,6 +1470,24 @@ with tabs[8]:
             text=year_data['player_name'],
             customdata=year_data[['team', 'salary_millions', 'value_over_expected', 'value_pct']],
             hovertemplate='<b>%{text}</b><br>' +
+                          'Team: %{customdata[0]}<br>' +
+                          'Salary: $%{customdata[1]:.1f}M<br>' +
+                          'Expected Rating: %{x:.1f}<br>' +
+                          'Actual Rating: %{y:.1f}<br>' +
+                          'Value Over Expected: %{customdata[2]:+.1f}<br>' +
+                          'Performance: %{customdata[3]:+.1f}%<br>' +
+                          '<extra></extra>'
+        ))
+        
+        fig.update_layout(
+            xaxis_title="Expected Rating (Based on Salary)",
+            yaxis_title="Actual Rating (Performance)",
+            hovermode='closest',
+            height=600
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
         # Value category breakdown
         st.markdown("---")
         st.subheader("Value Category Distribution")
