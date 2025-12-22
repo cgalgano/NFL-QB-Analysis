@@ -1456,7 +1456,7 @@ with tabs[8]:
         fig.add_trace(go.Scatter(
             x=year_data['expected_rating'],
             y=year_data['actual_rating'],
-            mode='markers',
+            mode='markers+text',
             name='QBs',
             marker=dict(
                 size=12,
@@ -1468,6 +1468,8 @@ with tabs[8]:
                 cmax=15
             ),
             text=year_data['player_name'],
+            textposition='top center',
+            textfont=dict(size=9),
             customdata=year_data[['team', 'salary_millions', 'value_over_expected', 'value_pct']],
             hovertemplate='<b>%{text}</b><br>' +
                           'Team: %{customdata[0]}<br>' +
