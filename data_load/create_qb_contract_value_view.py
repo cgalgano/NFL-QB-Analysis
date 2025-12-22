@@ -150,7 +150,7 @@ qb_value_base AS (
 )
 
 -- Final view with value calculations
-SELECT 
+SELECT DISTINCT
     player_name,
     player_id,
     season,
