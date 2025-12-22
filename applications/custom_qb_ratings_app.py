@@ -425,24 +425,21 @@ with tabs[0]:
                 opacity=0.8
             )
         
-        # Add career average markers (starting point)
+        # Add career average markers (small starting point)
         fig_trajectory.add_trace(go.Scatter(
             x=trajectory_data['career_rating'],
             y=trajectory_data['player_name'],
-            mode='markers+text',
-            marker=dict(size=12, color='gray', symbol='circle', line=dict(width=2, color='black')),
-            text=['START'] * len(trajectory_data),
-            textposition='middle center',
-            textfont=dict(size=7, color='white', family='Arial Black'),
-            name='Career Avg (Start)',
+            mode='markers',
+            marker=dict(size=8, color='lightgray', symbol='circle', line=dict(width=1, color='gray')),
+            name='Career Average',
             hovertemplate='<b>%{y}</b><br>Career Average: %{x:.1f}<extra></extra>'
         ))
         
-        # Add recent performance markers (ending point)
+        # Add recent performance markers (large ending point)
         fig_trajectory.add_trace(go.Scatter(
             x=trajectory_data['recent_rating'],
             y=trajectory_data['player_name'],
-            mode='markers+text',
+            mode='markers',
             marker=dict(
                 size=14, 
                 color=trajectory_data['trajectory'],
@@ -452,9 +449,6 @@ with tabs[0]:
                 line=dict(width=2, color='black'),
                 colorbar=dict(title="Change", x=1.15)
             ),
-            text=['NOW'] * len(trajectory_data),
-            textposition='middle center',
-            textfont=dict(size=7, color='white', family='Arial Black'),
             name='Recent (2024-25)',
             hovertemplate='<b>%{y}</b><br>' +
                          'Recent Rating: %{x:.1f}<br>' +
@@ -466,7 +460,7 @@ with tabs[0]:
         ))
         
         fig_trajectory.update_layout(
-            title='Recent Form vs Career Average (Top 20 QBs) - Arrow Shows Direction',
+            title='Recent Form vs Career Average (Top 20 QBs)',
             xaxis_title='Rating (50-100 Scale)',
             yaxis_title='',
             height=700,
@@ -484,7 +478,7 @@ with tabs[0]:
         
         st.plotly_chart(fig_trajectory, use_container_width=True)
         
-        st.caption("**START (gray)** = Career average | **NOW (colored)** = Recent (2024-25) | **Arrow direction** = Trajectory (Green = improving, Red = declining)")
+        st.caption("**Small gray dot** = Career average | **Large colored dot** = Recent (2024-25) | **Arrow direction** shows trajectory (Green = improving, Red = declining)")
         
         # New row: Attribute hexbin and Prime years analysis
         viz_col3, viz_col4 = st.columns(2)
