@@ -1,10 +1,13 @@
 name: Update NFL QB Data
 
-on:
-  schedule:
-    # Run every Tuesday at 10 AM UTC (after Monday Night Football)
-    - cron: '0 10 * * 2'
-  workflow_dispatch:  # Allow manual trigger from GitHub UI
+# Workflow currently disabled - manual updates only
+# To re-enable, uncomment the 'on:' section below
+
+# on:
+#   schedule:
+#     # Run every Tuesday at 10 AM UTC (after Monday Night Football)
+#     - cron: '0 10 * * 2'
+#   workflow_dispatch:  # Allow manual trigger from GitHub UI
 
 jobs:
   update-data:
