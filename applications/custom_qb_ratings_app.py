@@ -329,7 +329,7 @@ with tabs[0]:
             min_seasons = st.slider("Minimum Seasons Played", 1, int(rankings_df['seasons_played'].max()), 1, key="min_seasons_filter")
         
         with col2:
-            min_attempts = st.slider("Minimum Career Attempts", 0, int(rankings_df['total_attempts'].max()), 500, step=100, key="min_attempts_filter")
+            min_attempts = st.slider("Minimum Career Attempts", 0, int(rankings_df['total_attempts'].max()), 100, step=100, key="min_attempts_filter")
         
         with col3:
             show_top_n = st.slider("Show Top N QBs", 10, 50, 25, step=5, key="show_top_n")
@@ -895,9 +895,9 @@ with tabs[4]:
             'attempts': 'sum'
         }).reset_index()
         
-        # Filter for minimum attempts (at least 225 per season on average)
-        min_attempts = 225 * len(selected_years)
-        agg_df = agg_df[agg_df['attempts'] >= min_attempts]
+        # Filter for minimum attempts (more than 100 per season on average)
+        min_attempts = 100 * len(selected_years)
+        agg_df = agg_df[agg_df['attempts'] > min_attempts]
     else:
         agg_df = pd.DataFrame()
     
@@ -977,8 +977,8 @@ with tabs[5]:
         }).reset_index()
         
         # Filter for minimum attempts
-        min_attempts = 225 * len(selected_years)
-        agg_df = agg_df[agg_df['attempts'] >= min_attempts]
+        min_attempts = 100 * len(selected_years)
+        agg_df = agg_df[agg_df['attempts'] > min_attempts]
         
     else:
         agg_df = pd.DataFrame()
