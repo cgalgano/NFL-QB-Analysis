@@ -75,6 +75,20 @@ def main():
         log("Pipeline failed at data fetch step")
         return 1
     
+    if not run_command(
+        f"{sys.executable} data_load/load_qb_tables.py",
+        "Refreshing QB statistics and Next Gen Stats tables"
+    ):
+        log("Pipeline failed at QB table refresh")
+        return 1
+    
+    if not run_command(
+        f"{sys.executable} data_load/create_qb_plays_view.py",
+        "Rebuilding qb_plays view"
+    ):
+        log("Pipeline failed at qb_plays view")
+        return 1
+    
     # Step 2: Update QB statistics views
     if not run_command(
         f"{sys.executable} data_load/create_qb_season_stats_view.py",
@@ -102,7 +116,8 @@ def main():
         pm.execute_notebook(
             'modeling/custom_qb_rating_system.ipynb',
             'modeling/custom_qb_rating_system.ipynb',
-            kernel_name='python3'
+            kernel_name='python3',
+            cwd='modeling'
         )
         log("[OK] Completed: QB ratings regenerated")
     except ImportError:

@@ -173,7 +173,7 @@ def load_data():
 
 # --- Helper: Explanation of Ratings ---
 def rating_explanation():
-    st.markdown("""
+    st.markdown(f"""
     ### What Each Rating Means (50-100 Scale)
     
     **Overall Custom Rating**: Transparent formula-based rating combining efficiency, impact, consistency, volume, ball security, and pressure performance.
@@ -201,7 +201,7 @@ def rating_explanation():
     - **Ball Security (10%)**: Turnover Rate inverted (40%) + Sack Rate inverted (60%)
     - **Pressure Performance (10%)**: EPA Under Pressure (100%)
     
-    **Data Source**: Play-by-play data (2010-2025) aggregated to season level. Minimum 150 attempts per season.
+    **Data Source**: Play-by-play data (2010-{latest_season}) aggregated to season level. Minimum 150 attempts per season.
     """)
 
 # --- Streamlit App ---
@@ -209,11 +209,16 @@ st.set_page_config(page_title="Custom NFL QB Rankings", layout="wide")
 
 # Load data
 df, last_refresh = load_data()
+latest_season = int(df['season'].max())
+recent_seasons = [latest_season - 1, latest_season]
+recent_label = f"{latest_season - 1}-{latest_season % 100:02d}"
+recent_col = f"{recent_label} (70%)"
+current_col = f"Current ({latest_season})"
 
 # Header with last updated info
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.title("Custom NFL QB Rankings (2010-2025)")
+    st.title(f"Custom NFL QB Rankings (2010-{latest_season})")
 with col2:
     if last_refresh:
         from datetime import datetime
@@ -226,13 +231,13 @@ tabs = st.tabs(["Best Current QBs", "Top QBs by Year", "Player Career View", "Co
 with tabs[0]:
     st.header("Best Quarterbacks Right Now")
     st.markdown("**If you had to draft a QB today, who would you pick?**")
-    st.markdown("Rankings combine recent performance (2024-2025 heavily weighted) with full career history for current active players.")
+    st.markdown(f"Rankings combine recent performance ({recent_label} heavily weighted) with full career history for current active players.")
     
-    st.info("ℹ️ **Rating Scale:** All ratings are normalized across 2010-2025 (15 years) on a 50-100 scale. **100 = highest value**, 50 = lowest.")
+    st.info(f"ℹ️ **Rating Scale:** All ratings are normalized across 2010-{latest_season} on a 50-100 scale. **100 = highest value**, 50 = lowest.")
     
     try:
-        # Define current players as those who played in 2024 or 2025
-        current_seasons = [2024, 2025]
+        # Current players are those who played in either of the two most recent seasons
+        current_seasons = recent_seasons
         current_players = df[df['season'].isin(current_seasons)]['player_name'].unique()
         current_df = df[df['player_name'].isin(current_players)].copy()
         
@@ -248,13 +253,13 @@ with tabs[0]:
             # Get most recent season data
             latest_season = qb_data.iloc[-1]
             
-            # Separate recent (2024-2025) and historical data
-            recent_data = qb_data[qb_data['season'].isin([2024, 2025])]
-            historical_data = qb_data[~qb_data['season'].isin([2024, 2025])]
+            # Separate recent and historical data
+            recent_data = qb_data[qb_data['season'].isin(recent_seasons)]
+            historical_data = qb_data[~qb_data['season'].isin(recent_seasons)]
             
             # Calculate weighted components
             if len(recent_data) > 0:
-                # Recent performance (70% weight) - average of 2024-2025
+                # Recent performance (70% weight) - average of the two most recent seasons
                 recent_rating = recent_data['custom_rating'].mean()
                 recent_weight = 0.70
             else:
@@ -264,8 +269,8 @@ with tabs[0]:
             # Career performance (30% weight)
             if len(historical_data) > 0:
                 # Weight more recent historical years more (last 3 years = 50%, rest = 50%)
-                last_3_years = historical_data[historical_data['season'] >= 2021]
-                older_years = historical_data[historical_data['season'] < 2021]
+                last_3_years = historical_data[historical_data['season'] >= latest_season - 4]
+                older_years = historical_data[historical_data['season'] < latest_season - 4]
                 
                 if len(last_3_years) > 0 and len(older_years) > 0:
                     career_rating = (last_3_years['custom_rating'].mean() * 0.7 + 
@@ -345,13 +350,13 @@ with tabs[0]:
         ]].copy()
         
         display_df.columns = ['Rank', 'Player', 'Overall Score', 
-                             '2024-25 (70%)', 'Career (30%)', 
+                             recent_col, 'Career (30%)', 
                              'Seasons', 'Playstyle', 
                              'Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Mobility']
         
         # Round numeric columns to 1 decimal
         display_df['Overall Score'] = display_df['Overall Score'].round(1)
-        display_df['2024-25 (70%)'] = display_df['2024-25 (70%)'].round(1)
+        display_df[recent_col] = display_df[recent_col].round(1)
         display_df['Career (30%)'] = display_df['Career (30%)'].round(1)
         display_df['Playmaking'] = display_df['Playmaking'].round(1)
         display_df['Aggression'] = display_df['Aggression'].round(1)
@@ -361,14 +366,14 @@ with tabs[0]:
         display_df['Mobility'] = display_df['Mobility'].round(1)
         
         # Style the dataframe using RdYlGn gradient like Top 32 QBs tab
-        gradient_cols = ['Overall Score', '2024-25 (70%)', 'Career (30%)', 
+        gradient_cols = ['Overall Score', recent_col, 'Career (30%)', 
                         'Playmaking', 'Aggression', 'Accuracy', 'Ball Security', 'Pocket', 'Mobility']
         
         styled_df = display_df.style\
             .background_gradient(subset=gradient_cols, cmap='RdYlGn', vmin=50, vmax=100)\
             .format({
                 'Overall Score': '{:.1f}',
-                '2024-25 (70%)': '{:.1f}',
+                recent_col: '{:.1f}',
                 'Career (30%)': '{:.1f}',
                 'Playmaking': '{:.1f}',
                 'Aggression': '{:.1f}',
@@ -460,7 +465,7 @@ with tabs[0]:
                 line=dict(width=2, color='black'),
                 colorbar=dict(title="Change", x=1.15)
             ),
-            name='Recent (2024-25)',
+            name=f'Recent ({recent_label})',
             hovertemplate='<b>%{y}</b><br>' +
                          'Recent Rating: %{x:.1f}<br>' +
                          'Career Avg: ' + trajectory_data['career_rating'].apply(lambda x: f'{x:.1f}').astype(str) + '<br>' +
@@ -489,7 +494,7 @@ with tabs[0]:
         
         st.plotly_chart(fig_trajectory, use_container_width=True)
         
-        st.caption("**Small gray dot** = Career average | **Large colored dot** = Recent (2024-25) | **Arrow direction** shows trajectory (Green = improving, Red = declining)")
+        st.caption(f"**Small gray dot** = Career average | **Large colored dot** = Recent ({recent_label}) | **Arrow direction** shows trajectory (Green = improving, Red = declining)")
         
         # New row: Attribute hexbin and Prime years analysis
         viz_col3, viz_col4 = st.columns(2)
@@ -592,28 +597,28 @@ with tabs[0]:
                 'seasons_played', 'total_attempts', 'archetype'
             ]].copy()
             
-            compare_table.columns = ['Rank', 'Player', 'Overall', '2024-25', 'Career', 'Seasons', 'Att', 'Style']
+            compare_table.columns = ['Rank', 'Player', 'Overall', recent_label, 'Career', 'Seasons', 'Att', 'Style']
             compare_table['Overall'] = compare_table['Overall'].round(1)
-            compare_table['2024-25'] = compare_table['2024-25'].round(1)
+            compare_table[recent_label] = compare_table[recent_label].round(1)
             compare_table['Career'] = compare_table['Career'].round(1)
             
             st.dataframe(compare_table, use_container_width=True, hide_index=True)
         
         # Methodology explanation
         with st.expander("📊 How Rankings Are Calculated"):
-            st.markdown("""
+            st.markdown(f"""
             ### Weighted Rating Formula
             
             **Overall Score = (Recent Performance × 70%) + (Career Performance × 30%)**
             
             **Recent Performance (70% weight)**:
-            - Average rating from 2024-2025 seasons
+            - Average rating from {recent_seasons[0]}-{recent_seasons[1]} seasons
             - Reflects current form and abilities
             
             **Career Performance (30% weight)**:
-            - Weighted average of all seasons before 2024
-            - Recent years (2021-2023) weighted 70%
-            - Older years (pre-2021) weighted 30%
+            - Weighted average of all seasons before {recent_seasons[0]}
+            - Recent years ({latest_season - 4}-{latest_season - 2}) weighted 70%
+            - Older years (pre-{latest_season - 4}) weighted 30%
             
             ### Why This Approach?
             
@@ -624,7 +629,7 @@ with tabs[0]:
             
             ### Current Player Definition
             
-            Players who appeared in the 2024 or 2025 season are considered "current."
+            Players who appeared in the {recent_seasons[0]} or {recent_seasons[1]} season are considered "current."
             
             ### Use Case
             
@@ -645,7 +650,7 @@ with tabs[0]:
 with tabs[1]:
     st.header("Top 32 QBs - Custom Ratings & Playstyle Profiles")
     all_years = sorted(df['season'].unique(), reverse=True)
-    selected_years = st.multiselect("Select Year(s)", options=all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], format_func=str, key="year_filter_tab0")
+    selected_years = st.multiselect("Select Year(s)", options=all_years, default=all_years[:2], format_func=str, key="year_filter_tab0")
     filtered_df = df[df['season'].isin(selected_years)]
     
     # If only one year is selected, show that year's ratings
@@ -805,7 +810,7 @@ with tabs[2]:
 with tabs[3]:
     st.header("Rating Component Scores Analysis")
     all_years = sorted(df['season'].unique(), reverse=True)
-    selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else [all_years[0]], key="year_filter_tab2")
+    selected_years = st.multiselect("Select Year(s)", all_years, default=all_years[:2], key="year_filter_tab2")
     filtered_df = df[df['season'].isin(selected_years)]
     
     # If multiple years, aggregate
@@ -875,7 +880,7 @@ with tabs[3]:
 with tabs[4]:
     st.header("Total Pass EPA vs CPOE Scatter Plot")
     all_years = sorted(df['season'].unique(), reverse=True)
-    selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab3")
+    selected_years = st.multiselect("Select Year(s)", all_years, default=all_years[:2], key="year_filter_tab3")
     
     # Aggregate data by player across selected seasons
     if selected_years:
@@ -956,7 +961,7 @@ with tabs[4]:
 with tabs[5]:
     st.header("Sack Rate vs Yards/Attempt Scatter Plot")
     all_years = sorted(df['season'].unique(), reverse=True)
-    selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab5")
+    selected_years = st.multiselect("Select Year(s)", all_years, default=all_years[:2], key="year_filter_tab5")
     
     # Aggregate data by player across selected seasons
     if selected_years:
@@ -1062,7 +1067,7 @@ with tabs[6]:
     """)
     
     all_years = sorted(df['season'].unique(), reverse=True)
-    selected_years = st.multiselect("Select Year(s)", all_years, default=[2024, 2025] if 2024 in all_years else all_years[:2], key="year_filter_tab6")
+    selected_years = st.multiselect("Select Year(s)", all_years, default=all_years[:2], key="year_filter_tab6")
     
     # Filter to QBs with both ratings
     comparison_df = df[df['season'].isin(selected_years) & df['composite_rating'].notna()].copy()
@@ -1311,7 +1316,7 @@ with tabs[7]:
                 'Seasons': len(qb_data),
                 'Peak Rating': qb_data['custom_rating'].max(),
                 'Avg Rating': qb_data['custom_rating'].mean(),
-                'Current (2025)': qb_data[qb_data['season'] == 2025]['custom_rating'].values[0] if 2025 in qb_data['season'].values else 'N/A',
+                current_col: qb_data[qb_data['season'] == latest_season]['custom_rating'].values[0] if latest_season in qb_data['season'].values else 'N/A',
                 'Archetype': qb_data['archetype'].mode()[0] if not qb_data['archetype'].mode().empty else 'N/A',
                 'Total Attempts': qb_data['attempts'].sum()
             }
@@ -1323,7 +1328,7 @@ with tabs[7]:
         st.dataframe(career_df.style.format({
             'Peak Rating': '{:.1f}',
             'Avg Rating': '{:.1f}',
-            'Current (2025)': lambda x: f'{x:.1f}' if isinstance(x, (int, float)) else x,
+            current_col: lambda x: f'{x:.1f}' if isinstance(x, (int, float)) else x,
             'Total Attempts': '{:,.0f}'
         }), use_container_width=True)
         
@@ -1593,8 +1598,8 @@ with tabs[8]:
 
 # Footer
 st.markdown("---")
-st.markdown("""
-**Data Source**: Play-by-play data from nflfastR (2010-2025)  
+st.markdown(f"""
+**Data Source**: Play-by-play data from nflfastR (2010-{latest_season})  
 **Minimum Qualification**: 150 pass attempts per season  
 **Rating Scale**: 50-100 (F to A+, like traditional grading)  
 **Methodology**: Transparent formula-based system emphasizing efficiency, impact, consistency, volume, ball security, and pressure performance

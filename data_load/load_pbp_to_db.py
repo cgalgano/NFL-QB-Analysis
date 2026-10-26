@@ -1,18 +1,19 @@
 """
 Load nflreadpy play-by-play data into SQLite database
-Focuses on QB-relevant fields for analysis (2021-2025)
+Focuses on QB-relevant fields for analysis (2010 through the current season)
 """
 
 import pandas as pd
 import sqlite3
 import nflreadpy
 from datetime import datetime
+from pathlib import Path
 
 # Database configuration
-DB_PATH = "c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db"
+DB_PATH = str(Path(__file__).resolve().parent / "nfl_qb_data.db")
 TABLE_NAME = "play_by_play"
 START_YEAR = 2010
-END_YEAR = 2025
+END_YEAR = nflreadpy.get_current_season()
 
 # Define QB-relevant columns to keep
 QB_RELEVANT_COLUMNS = [

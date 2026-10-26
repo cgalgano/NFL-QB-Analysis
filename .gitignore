@@ -38,6 +38,7 @@ wheels/
 # CSV files - ignore in specific directories only
 initial_stuff/*.csv
 data_load/**/*.csv
+!data_load/reference/*.csv
 
 # Keep modeling/models files tracked
 

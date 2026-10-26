@@ -4,8 +4,9 @@ This view eliminates the need to aggregate play-by-play data in every notebook.
 """
 
 import sqlite3
+from pathlib import Path
 
-db_path = 'c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db'
+db_path = Path(__file__).resolve().parent / 'nfl_qb_data.db'
 
 # SQL to create pre-aggregated season stats view
 create_view_sql = """

@@ -4,8 +4,9 @@ This view handles the column naming complexity and filters to confirmed QBs only
 """
 
 import sqlite3
+from pathlib import Path
 
-def create_qb_plays_view(db_path='c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db'):
+def create_qb_plays_view(db_path=Path(__file__).resolve().parent / 'nfl_qb_data.db'):
     """
     Creates a view called 'qb_plays' that properly filters play-by-play data.
     
