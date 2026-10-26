@@ -128,8 +128,9 @@ def assign_custom_archetype(row):
 
 # --- Load Data ---
 @st.cache_data
-def load_data():
+def load_data(csv_mtime):
     """Load QB ratings data from CSV files (optimized for cloud deployment)."""
+    # csv_mtime is unused in the body; it changes the cache key when the CSV is refreshed
     try:
         # Load custom ratings
         df = pd.read_csv('modeling/models/custom_qb_ratings.csv')
@@ -208,7 +209,7 @@ def rating_explanation():
 st.set_page_config(page_title="Custom NFL QB Rankings", layout="wide")
 
 # Load data
-df, last_refresh = load_data()
+df, last_refresh = load_data(Path('modeling/models/custom_qb_ratings.csv').stat().st_mtime)
 latest_season = int(df['season'].max())
 recent_seasons = [latest_season - 1, latest_season]
 recent_label = f"{latest_season - 1}-{latest_season % 100:02d}"
