@@ -251,7 +251,7 @@ with tabs[0]:
                 continue
             
             # Get most recent season data
-            latest_season = qb_data.iloc[-1]
+            latest_row = qb_data.iloc[-1]
             
             # Separate recent and historical data
             recent_data = qb_data[qb_data['season'].isin(recent_seasons)]
@@ -291,7 +291,7 @@ with tabs[0]:
             if recent_weight + career_weight > 0:
                 weighted_rating = (recent_rating * recent_weight + career_rating * career_weight)
             else:
-                weighted_rating = latest_season['custom_rating']
+                weighted_rating = latest_row['custom_rating']
             
             # Get additional context
             total_seasons = len(qb_data)
@@ -301,20 +301,20 @@ with tabs[0]:
             rankings.append({
                 'player_name': qb,
                 'weighted_rating': weighted_rating,
-                'recent_rating': recent_rating if len(recent_data) > 0 else latest_season['custom_rating'],
+                'recent_rating': recent_rating if len(recent_data) > 0 else latest_row['custom_rating'],
                 'career_rating': qb_data['custom_rating'].mean(),
-                'latest_season': latest_season['season'],
+                'latest_season': latest_row['season'],
                 'seasons_played': len(seasons_played),
                 'first_season': min(seasons_played),
                 'last_season': max(seasons_played),
                 'total_attempts': total_attempts,
-                'archetype': latest_season.get('archetype', 'N/A'),
-                'mobility': latest_season['mobility_rating'],
-                'aggression': latest_season['aggression_rating'],
-                'accuracy': latest_season['accuracy_rating'],
-                'ball_security': latest_season['ball_security_rating'],
-                'pocket_presence': latest_season['pocket_presence_rating'],
-                'playmaking': latest_season['playmaking_rating']
+                'archetype': latest_row.get('archetype', 'N/A'),
+                'mobility': latest_row['mobility_rating'],
+                'aggression': latest_row['aggression_rating'],
+                'accuracy': latest_row['accuracy_rating'],
+                'ball_security': latest_row['ball_security_rating'],
+                'pocket_presence': latest_row['pocket_presence_rating'],
+                'playmaking': latest_row['playmaking_rating']
             })
         
         # Create rankings dataframe
