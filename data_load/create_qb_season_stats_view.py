@@ -166,7 +166,7 @@ LEFT JOIN next_gen_stats ngs
     ON s.player_id = ngs.player_id 
     AND s.season = ngs.season 
     AND ngs.week = 0
-WHERE s.attempts >= 225  -- Filter to meaningful sample sizes (roughly 13+ games started)
+WHERE s.attempts > 100
 ORDER BY s.season DESC, s.total_pass_epa DESC;
 """
 

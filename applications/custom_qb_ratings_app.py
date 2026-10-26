@@ -202,7 +202,7 @@ def rating_explanation():
     - **Ball Security (10%)**: Turnover Rate inverted (40%) + Sack Rate inverted (60%)
     - **Pressure Performance (10%)**: EPA Under Pressure (100%)
     
-    **Data Source**: Play-by-play data (2010-{latest_season}) aggregated to season level. Minimum 150 attempts per season.
+    **Data Source**: Play-by-play data (2010-{latest_season}) aggregated to season level. Minimum of more than 100 dropbacks per season.
     """)
 
 # --- Streamlit App ---
@@ -1601,7 +1601,7 @@ with tabs[8]:
 st.markdown("---")
 st.markdown(f"""
 **Data Source**: Play-by-play data from nflfastR (2010-{latest_season})  
-**Minimum Qualification**: 150 pass attempts per season  
+**Minimum Qualification**: More than 100 dropbacks per season  
 **Rating Scale**: 50-100 (F to A+, like traditional grading)  
 **Methodology**: Transparent formula-based system emphasizing efficiency, impact, consistency, volume, ball security, and pressure performance
 """)
