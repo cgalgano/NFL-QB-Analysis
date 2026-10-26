@@ -131,6 +131,13 @@ def main():
         log("Please manually run the notebook: modeling/custom_qb_rating_system.ipynb")
         return 1
     
+    if not run_command(
+        f"{sys.executable} data_load/create_qb_contract_value_view.py",
+        "Regenerating contract value analysis"
+    ):
+        log("Pipeline failed at contract value step")
+        return 1
+    
     # Step 4: Update timestamp
     if not update_timestamp():
         log("Warning: Could not update timestamp, but data is refreshed")

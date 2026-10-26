@@ -5,10 +5,12 @@ Combines QB season stats with contract data to analyze value vs performance.
 
 import sqlite3
 import pandas as pd
-import os
+from pathlib import Path
 
-db_path = 'c:/Users/carme/NFL_QB_Project/data_load/nfl_qb_data.db'
-ratings_csv_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/custom_qb_ratings.csv'
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+db_path = PROJECT_DIR / 'data_load' / 'nfl_qb_data.db'
+ratings_csv_path = PROJECT_DIR / 'modeling' / 'models' / 'custom_qb_ratings.csv'
+csv_output_path = PROJECT_DIR / 'modeling' / 'models' / 'qb_contract_value.csv'
 
 print("="*80)
 print("Loading custom ratings from CSV...")
@@ -30,7 +32,7 @@ create_view_sql = """
 CREATE VIEW IF NOT EXISTS qb_contract_value AS
 WITH
 -- Expand contracts to all years they cover
-contract_years AS (
+contract_years_all AS (
     SELECT 
         pc.player_id,
         pc.player_name,
@@ -54,6 +56,17 @@ contract_years AS (
       AND n.year_offset < pc.years  -- Only include years within contract length
 ),
 
+-- Old deals still overlap after extensions/releases; keep the most recently signed one
+contract_years AS (
+    SELECT * FROM (
+        SELECT *, ROW_NUMBER() OVER (
+            PARTITION BY player_id, season ORDER BY year_signed DESC, apy DESC
+        ) AS rn
+        FROM contract_years_all
+    )
+    WHERE rn = 1
+),
+
 -- Get stats from qb_season_stats view
 qb_stats AS (
     SELECT
@@ -69,7 +82,7 @@ qb_stats AS (
         turnover_rate,
         total_wpa
     FROM qb_season_stats
-    WHERE attempts >= 100
+    WHERE attempts > 100
 ),
 
 -- Load pre-calculated ratings from temp table (same ratings the app uses)
@@ -283,9 +296,10 @@ print("="*80)
 
 export_query = "SELECT * FROM qb_contract_value"
 export_df = pd.read_sql_query(export_query, conn)
-output_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/qb_contract_value.csv'
-export_df.to_csv(output_path, index=False)
-print(f"Exported {len(export_df)} records to {output_path}")
+# Same dedupe the app applies to ratings: a player_id can appear under two name spellings
+export_df = export_df.sort_values('attempts', ascending=False).drop_duplicates(subset=['player_id', 'season'])
+export_df.to_csv(csv_output_path, index=False)
+print(f"Exported {len(export_df)} records to {csv_output_path}")
 
 conn.close()
 
@@ -298,19 +312,4 @@ print("\nFiltered examples:")
 print("  SELECT * FROM qb_contract_value WHERE season = 2024")
 print("  SELECT * FROM qb_contract_value WHERE value_category = 'Excellent Value'")
 print("  SELECT * FROM qb_contract_value WHERE value_score > 15 ORDER BY season")
-print("="*80)
-
-# Export to CSV for Streamlit Cloud deployment
-print("\n" + "="*80)
-print("Exporting to CSV for Streamlit deployment...")
-print("="*80)
-
-conn_export = sqlite3.connect(db_path)
-export_df = pd.read_sql_query("SELECT * FROM qb_contract_value", conn_export)
-conn_export.close()
-
-csv_output_path = 'c:/Users/carme/NFL_QB_Project/modeling/models/qb_contract_value.csv'
-export_df.to_csv(csv_output_path, index=False)
-
-print(f"[OK] Exported {len(export_df)} records to {csv_output_path}")
 print("="*80)

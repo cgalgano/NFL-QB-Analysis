@@ -57,6 +57,14 @@ def refresh_next_gen_stats(conn):
     print(f"next_gen_stats: {len(ngs):,} rows for {seasons[0]}-{seasons[-1]}")
 
 
+def refresh_player_contracts(conn):
+    contracts = nflreadpy.load_contracts().to_pandas()
+    contracts = contracts.drop(columns=["season_history", "contract_history"], errors="ignore")
+    contracts = contracts.rename(columns={"player": "player_name", "gsis_id": "player_id"})
+    contracts.to_sql("player_contracts", conn, if_exists="replace", index=False)
+    print(f"player_contracts: {len(contracts):,} rows")
+
+
 def seed_reference_tables(conn):
     for table in ["espn_qbr", "nflelo_qb_rankings"]:
         if not table_columns(conn, table):
@@ -69,6 +77,7 @@ def main():
     try:
         refresh_qb_statistics(conn)
         refresh_next_gen_stats(conn)
+        refresh_player_contracts(conn)
         seed_reference_tables(conn)
         conn.commit()
     finally:

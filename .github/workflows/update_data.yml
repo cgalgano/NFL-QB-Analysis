@@ -36,7 +36,9 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add modeling/models/*.csv
+        # Commit every run so GitHub doesn't disable the schedule during the offseason
+        date -u +'%Y-%m-%d' > data_load/last_refresh.txt
+        git add modeling/models/*.csv data_load/last_refresh.txt
         git diff --staged --quiet || git commit -m "Auto-update QB data - $(date +'%Y-%m-%d') [skip ci]"
         git push
       env:
